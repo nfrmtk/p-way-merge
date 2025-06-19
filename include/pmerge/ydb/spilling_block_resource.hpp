@@ -1,0 +1,154 @@
+//
+// Created by nfrmtk on 6/13/25.
+//
+
+#ifndef SPILLING_BLOCK_RESOURCE_HPP
+#define SPILLING_BLOCK_RESOURCE_HPP
+#include <pmerge/ydb/spilling_mem.h>
+
+#include <bitset>
+#include <pmerge/common/assert.hpp>
+#include <pmerge/common/resource.hpp>
+#include <pmerge/ydb/spilling_block_reader.hpp>
+
+#include "pmerge/simd/utils.hpp"
+namespace pmerge::ydb {
+namespace detail {
+// class BufferedSpillBlock {
+//  public:
+//   BufferedSpillBlock(TSpilling& stats, TSpillingBlock data)
+//       : stats_(stats), data_(data) {
+//   }
+//   std::span<const Slot> ConsumeAll() {
+//     // PMERGE_ASSERT(
+//     //     data_offset_bytes_ % 64 == 0,
+//     //     std::format(
+//     //         "incorrect offset {}, TSpillingBlock should be read by
+//     Slot's",
+//     //         data_offset_bytes_));
+//     int64_t slots_consumed = std::min(
+//         slots,
+//         (static_cast<int64_t>(data_.BlockSize) / 64 - data_offset_slots_));
+//     std::span<const Slot> slots_output = buffer_.subspan(0, slots_consumed);
+//         // static_cast<const Slot*>(data_.ExternalMemory) +
+//         //     data_offset_slots_, static_cast<const
+//         Slot*>(data_.ExternalMemory) + data_offset_slots_ + slots_consumed};
+//     data_offset_slots_ += slots_consumed * kSlotBytes;
+//     return slots_output;
+//   }
+//   template <int Size>
+//   void Consume(std::span<IntermediateInteger>& buffer,
+//                std::bitset<Size> index) noexcept {
+//     constexpr int kIntermediateIntegerSize = sizeof(IntermediateInteger);
+//     int64_t new_span_size = std::min(
+//         std::ssize(buffer),
+//         static_cast<int64_t>(data_.BlockSize / 64) - data_offset_slots_);
+//
+//     buffer = buffer.subspan(0, new_span_size);
+//     int64_t total_external_memory_read_bytes = new_span_size * kSlotBytes;
+//     for (int offset = 0; offset < total_external_memory_read_bytes;
+//          offset += kSlotBytes) {
+//       uint64_t hash;
+//       stats_.Load(data_, data_offset_slots_ * kSlotBytes + offset, &hash,
+//                   sizeof(hash));  // fixme: dont call TSpilling::Load too
+//                   often.
+//       buffer[offset / kSlotBytes] = PackFrom(hash, index);
+//     }
+//     data_offset_slots_ += new_span_size;
+//     // PMERGE_ASSERT(buffer.size() % 4 == 0, "buffer must be splittable in
+//     __m256i");
+//   }
+//   // std::span<const uint64_t> GetLoaded() const noexcept;
+//   // void AdvanceBy(int shift);
+//  private:
+//   TSpilling& stats_;
+//   TSpillingBlock data_;
+//   int64_t data_offset_slots_ = 0;
+//   std::span<Slot> buffer_;
+//   // std::span<uint64_t> buffer_left_;
+//   // const std::span<uint64_t> buffer_;
+// };
+
+}  // namespace detail
+
+template <int IndexSizeBits>
+class SpillingBlockBufferedResource {
+ public:
+  SpillingBlockBufferedResource(TSpilling& spilling, TSpillingBlock block,
+                                std::span<uint64_t> my_buffer,
+                                std::bitset<IndexSizeBits> resource_identifier)
+      :
+        resource_identifier_(resource_identifier),stats_(spilling),
+        blocks_reader_(SpillingBlocksBuffer{spilling, block, my_buffer}),
+        current_num_(GetPackedInt()),
+        total_slots_(block.BlockSize>>8){
+    static_assert(
+        pmerge::Resource<
+            pmerge::ydb::SpillingBlockBufferedResource<IndexSizeBits>>,
+        "SpillingBlockResource must be resource");
+  }
+  IntermediateInteger Peek() const {
+    return current_num_;
+  }
+  __m256i GetOne() {
+    auto next = GetOneHelper();
+    // auto next = _mm256_loadu_si256(
+    //     reinterpret_cast<__m256i* const>(current_buffer_.data()));
+    std::cout << "SpillingBlockBufferedResource::GetOne another array: "
+              << simd::ToString(next) << '\n';
+    return next;
+  }
+
+ private:
+  __m256i GetOneHelper() {
+    if (currently_processed_slots_ >= total_slots_) {
+      return simd::kInfVector;
+    }
+    if (currently_processed_slots_ + 4 >= total_slots_) { // once per this resource
+      IntermediateInteger pack[4] = {kInf, kInf, kInf, kInf};
+      pack[0] = current_num_;
+      int slots_left = total_slots_ - currently_processed_slots_ - 1;
+      PMERGE_ASSERT(slots_left >= 0);
+      PMERGE_ASSERT(slots_left <3);
+      for (int idx = 0; idx < slots_left; ++idx) {
+        pack[idx+1] = GetPackedInt();
+      }
+      current_num_ = kInf;
+      currently_processed_slots_ = total_slots_;
+      return pmerge::simd::MakeFrom(pack[0], pack[1], pack[2], pack[3]);
+    }
+    IntermediateInteger first = current_num_;
+    IntermediateInteger second = GetPackedInt();
+    IntermediateInteger third = GetPackedInt();
+    IntermediateInteger forth = GetPackedInt();
+    current_num_ = GetPackedInt();
+    currently_processed_slots_ += 4;
+
+    return pmerge::simd::MakeFrom(
+        first, second, third, forth);
+
+  }
+  IntermediateInteger GetPackedInt() { return PackFrom(GetHash(blocks_reader_.AdvanceByOne()), resource_identifier_); }
+  // std::span<const Slot> ResetBuffer() {
+  //   auto buff = blocks_buffer_.ResetBuffer();
+  //   PMERGE_ASSERT(
+  //       buff.size() % 4 == 0,
+  //       std::format(
+  //           "buffer needs to be splittable in groups of 4, current size: {}",
+  //           buff.size()));
+  //   return buff;
+  // }
+
+  std::bitset<IndexSizeBits> resource_identifier_;
+  TSpilling& stats_;
+  SpillingBlockReader blocks_reader_;
+  IntermediateInteger current_num_;
+  int64_t total_slots_;
+  int64_t currently_processed_slots_ = 0;
+  // pmerge::ydb::SpillingBlocksBuffer blocks_buffer_;
+  // std::span<uint64_t> current_buffer_;
+};
+
+}  // namespace pmerge::ydb
+
+#endif  // SPILLING_BLOCK_RESOURCE_HPP
