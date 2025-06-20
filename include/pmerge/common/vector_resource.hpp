@@ -8,10 +8,22 @@
 #include <immintrin.h>
 
 #include <bitset>
+#include <cstdint>
 #include <pmerge/common/resource.hpp>
 #include <vector>
 
 namespace pmerge::common {
+template <size_t IndexSize>
+std::vector<int64_t> FromDataAndIndex(const std::vector<uint64_t>& data,
+                                        std::bitset<IndexSize> index) {
+  std::vector<pmerge::IntermediateInteger> vec;
+  for (int64_t num : data) {
+    vec.push_back(pmerge::PackFrom(num, index));
+  }
+  return vec;
+}
+
+
 class VectorResource {
  public:
   explicit VectorResource(std::vector<pmerge::IntermediateInteger> vec);
@@ -21,15 +33,6 @@ class VectorResource {
   VectorResource(VectorResource&& other) noexcept = default;
   VectorResource& operator=(VectorResource&& other) noexcept = default;
 
-  template <size_t IndexSize>
-  static VectorResource FromDataAndIndex(const std::vector<uint64_t>& data,
-                                         std::bitset<IndexSize> index) {
-    std::vector<pmerge::IntermediateInteger> vec;
-    for (int64_t num : data) {
-      vec.push_back(pmerge::PackFrom(num, index));
-    }
-    return VectorResource{std::move(vec)};
-  }
 
   [[nodiscard]] int64_t Peek() const;
 

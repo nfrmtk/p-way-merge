@@ -37,15 +37,15 @@ template <uint64_t IndexSize>
 IntermediateInteger PackFrom(uint64_t num, std::bitset<IndexSize> index) {
   static_assert(IndexSize <= 10, "index must be small");
   constexpr int64_t kMaxTakenBits = 1ll << (64 - IndexSize - 1);
-  int64_t taken_bits = num >> (IndexSize + 1);
-  assert(taken_bits >= 0 && ((IndexSize == 0) || taken_bits < kMaxTakenBits));
+  uint64_t taken_bits = (num >> (IndexSize + 1)) << IndexSize;
+  assert(taken_bits >= 0 && ((IndexSize == 0) || taken_bits < kMaxTakenBits) && taken_bits%(1<<IndexSize) == 0);
   constexpr uint64_t kMaxIndex = 1ull << IndexSize;
   assert(index.to_ullong() < kMaxIndex);
   assert((index.to_ullong() & (taken_bits << IndexSize)) == 0);
   IntermediateInteger intermediate =
       static_cast<IntermediateInteger>(index.to_ullong()) +
       std::numeric_limits<IntermediateInteger>::min() +
-      (taken_bits << IndexSize);
+      static_cast<IntermediateInteger>(taken_bits);
   assert(IsValid(intermediate));
   return intermediate;
 }
