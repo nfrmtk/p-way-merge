@@ -17,9 +17,13 @@ template <pmerge::Resource FirstSource, pmerge::Resource SecondSource>
 class SimdTwoWayMerger {
  public:
   using ValueType = __m256i;
-  SimdTwoWayMerger(FirstSource first, SecondSource second) noexcept
-      : first_(std::forward<FirstSource>(first)),
-        second_(std::forward<SecondSource>(second)) {
+  SimdTwoWayMerger(FirstSource first, SecondSource second) noexcept: SimdTwoWayMerger(std::move(first), std::move(second), true){}
+  SimdTwoWayMerger(FirstSource first, SecondSource second, bool print_registers) noexcept
+      : print_registers_(print_registers),
+        first_(std::forward<FirstSource>(first)),
+        second_(std::forward<SecondSource>(second)),
+        vMin_(pmerge::simd::kInfVector),
+        vMax_(pmerge::simd::kInfVector) {
     static_assert(pmerge::Resource<SimdTwoWayMerger>,
                   "SimdTwoWayMerger must be pmerge::Resource");
     vMin_ = first_.GetOne();
@@ -53,10 +57,15 @@ class SimdTwoWayMerger {
   void PrintRegister(
       std::string_view prefix = "",
       std::source_location loc = std::source_location::current()) const {
-    std::cout << std::format(
-        "state: {},  min: {}, max: {}, header line number: {}\n", prefix,
-        simd::ToString(vMin_), simd::ToString(vMax_), loc.line());
+#ifndef NDEBUG
+    if (print_registers_){
+      std::cout << std::format(
+          "state: {},  min: {}, max: {}, header line number: {}\n", prefix,
+          simd::ToString(vMin_), simd::ToString(vMax_), loc.line());
+      }
+#endif
   }
+  bool print_registers_;
   FirstSource first_;
   SecondSource second_;
   ValueType vMin_;

@@ -7,6 +7,7 @@
 
 #include <immintrin.h>
 
+#include <cstdint>
 #include <ostream>
 #include <random>
 #include <vector>
@@ -65,8 +66,8 @@ inline std::array<uint64_t, 8> MergeSimple(__m256i first, __m256i second) {
   return ret;
 }
 
-inline void FillVector(std::vector<int64_t>& vec, std::mt19937& random) {
-  int current = 0;
+inline void FillVector(std::vector<uint64_t>& vec, std::mt19937& random) {
+  uint64_t current = 0;
   std::uniform_int_distribution<> distr(0, 10);
   for (auto& num : vec) {
     num = current += distr(random);
