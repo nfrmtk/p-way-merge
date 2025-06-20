@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <pmerge/simd/utils.hpp>
 #include <pmerge/two_way/simd_two_way.hpp>
 #include <pmerge/ydb/spilling_block_resource.hpp>
@@ -11,19 +12,6 @@
 #include <ranges>
 
 #include "utils.hpp"
-static constexpr int kSpillBlockSize = 1 << 10;
-template <typename Value>
-std::span<Value> AsSpan(TSpillingBlock& block) {
-  return std::span{static_cast<const pmerge::ydb::Slot*>(block.ExternalMemory),
-                   static_cast<const pmerge::ydb::Slot*>(block.ExternalMemory) +
-                       block.BlockSize / sizeof(pmerge::ydb::Slot)};
-}
-template <typename T>
-TSpillingBlock MakeSpillingBlock(const std::unique_ptr<T>& pointer,
-                                 int64_t size) {
-  return TSpillingBlock{pointer.get(),
-                        size * sizeof(std::remove_all_extents_t<T>), 0};
-}
 
 constexpr int kExternalMemorySize = 1 << 15;
 
@@ -46,8 +34,8 @@ void TestMerge() {
 
   static constexpr int kBuffSize = 1 << 8;
 
-  std::unique_ptr<pmerge::ydb::Slot[]> first_buff =
-      std::make_unique<pmerge::ydb::Slot[]>(kBuffSize);
+  std::unique_ptr<uint64_t[]> first_buff =
+      std::make_unique<uint64_t[]>(kBuffSize);
   std::generate_n(first_buff.get(), kBuffSize,
                   []() { return pmerge::ydb::Slot{}; });
   std::unique_ptr<pmerge::ydb::Slot[]> second_buff =

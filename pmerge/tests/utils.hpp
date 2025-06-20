@@ -6,16 +6,47 @@
 #define UTILS_HPP
 
 #include <immintrin.h>
-
+#include <pmerge/ydb/spilling_block_resource.hpp>
+#include <cstdint>
+#include <memory>
 #include <ostream>
 #include <random>
 #include <vector>
+#include "pmerge/ydb/spilling_mem.h"
 namespace std {
 inline std::ostream& operator<<(std::ostream& os, __m256i reg) {
   os << pmerge::simd::ToString(reg);
   return os;
 }
 }  // namespace std
+
+constexpr int kExternalMemorySize = 1 << 15;
+
+static constexpr int kSpillBlockSize = 1 << 10;
+template <typename Value>
+std::span<Value> AsSpan(TSpillingBlock& block) {
+  return std::span{static_cast<const pmerge::ydb::Slot*>(block.ExternalMemory),
+                   static_cast<const pmerge::ydb::Slot*>(block.ExternalMemory) +
+                       block.BlockSize / sizeof(pmerge::ydb::Slot)};
+}
+template <typename T>
+TSpillingBlock MakeSpillingBlock(const std::unique_ptr<T>& pointer,
+                                 int64_t size) {
+  return TSpillingBlock{pointer.get(),
+                        size * sizeof(std::remove_all_extents_t<T>), 0};
+}
+
+
+struct CompleteYdbBufferResource{
+  std::unique_ptr<uint64_t[]> buffer;
+  pmerge::ydb::SpillingBlockBufferedResource<1> resource;
+};
+
+
+CompleteYdbBufferResource MakeResource(TSpilling& spilling){
+
+}
+
 
 inline void GetComplimentary(const uint64_t* arr, uint64_t* dst) {
   int out_idx = 0;
