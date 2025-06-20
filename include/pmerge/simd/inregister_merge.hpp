@@ -13,10 +13,10 @@
 
 #define PMERGE_MINMAX(vMin, vMax)                     \
   {                                                   \
-    auto mask = _mm256_cmpgt_epi64(vMin, vMax);       \
-    auto vTmp = _mm256_blendv_epi8(vMin, vMax, mask); \
-    vMax = _mm256_blendv_epi8(vMax, vMin, mask);      \
-    vMin = vTmp;                                      \
+    auto __mask = _mm256_cmpgt_epi64(vMin, vMax);       \
+    auto __vTmp = _mm256_blendv_epi8(vMin, vMax, __mask); \
+    vMax = _mm256_blendv_epi8(vMax, vMin, __mask);      \
+    vMin = __vTmp;                                      \
   }
 
 #define PMERGE_MERGE(vMin, vMax)                                    \

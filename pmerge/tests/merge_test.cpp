@@ -14,15 +14,15 @@ TEST(Simd, MergeSimple) {
   auto reg_odd = pmerge::simd::MakeFrom(1, 3, 5, 7);
   auto reg_even = pmerge::simd::MakeFrom(2, 4, 6, 8);
   PMERGE_MERGE(reg_even, reg_odd);
-  ASSERT_PRED2(CompareRegistersEqual, reg_even, MakeFrom(1, 2, 3, 4));
-  ASSERT_PRED2(CompareRegistersEqual, reg_odd, MakeFrom(5, 6, 7, 8));
+  ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, reg_even, pmerge::simd::MakeFrom(1, 2, 3, 4));
+  ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, reg_odd, pmerge::simd::MakeFrom(5, 6, 7, 8));
 }
 
 TEST(Simd, CompleteEnumerationNoEqualElements) {
   ForEachPermutationsOfRegisters([](__m256i vMin, __m256i vMax) {
     PMERGE_MERGE(vMin, vMax);
-    ASSERT_PRED2(CompareRegistersEqual, vMin, MakeFrom(1, 2, 3, 4));
-    ASSERT_PRED2(CompareRegistersEqual, vMax, MakeFrom(5, 6, 7, 8));
+    ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, vMin, pmerge::simd::MakeFrom(1, 2, 3, 4));
+    ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, vMax, pmerge::simd::MakeFrom(5, 6, 7, 8));
   });
 }
 
@@ -34,25 +34,25 @@ TEST(Simd, CompleteEnumerationNoEqualElementsButBig) {
     PMERGE_MINMAX(mask, vMax);
     auto ans = MergeSimple(vMin, vMax);
     PMERGE_MERGE(vMin, vMax);
-    ASSERT_PRED2(CompareRegistersEqual, vMin,
+    ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, vMin,
                  pmerge::simd::MakeFrom(ans[0], ans[1], ans[2], ans[3]));
-    ASSERT_PRED2(CompareRegistersEqual, vMax,
+    ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, vMax,
                  pmerge::simd::MakeFrom(ans[4], ans[5], ans[6], ans[7]));
   });
 }
 
 TEST(Simd, MinMax) {
-  auto reg_bigger = MakeFrom(1, 1, 4, 4);
-  auto reg_smaller = MakeFrom(3, 3, 2, 2);
+  auto reg_bigger = pmerge::simd::MakeFrom(1, 1, 4, 4);
+  auto reg_smaller = pmerge::simd::MakeFrom(3, 3, 2, 2);
 
-  pmerge::simd::MinMax(reg_smaller, reg_bigger);
-  ASSERT_PRED2(CompareRegistersEqual, reg_smaller, MakeFrom(1, 1, 2, 2))
-      << ToString(reg_bigger);
-  ASSERT_PRED2(CompareRegistersEqual, reg_bigger, MakeFrom(3, 3, 4, 4))
-      << ToString(reg_bigger);
+  PMERGE_MINMAX(reg_smaller, reg_bigger);
+  ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, reg_smaller, pmerge::simd::MakeFrom(1, 1, 2, 2))
+      << pmerge::simd::ToString(reg_bigger);
+  ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, reg_bigger, pmerge::simd::MakeFrom(3, 3, 4, 4))
+      << pmerge::simd::ToString(reg_bigger);
 }
 
 TEST(Simd, GetSingleUInt64) {
-  auto reg = MakeFrom(1, 2, 3, 4);
+  auto reg = pmerge::simd::MakeFrom(1, 2, 3, 4);
   ASSERT_EQ(pmerge::simd::Get64MostSignificantBits(reg), 1);
 }
