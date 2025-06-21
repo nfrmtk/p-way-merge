@@ -1,4 +1,4 @@
-Сборка: 
+# Сборка: 
 
 ### Пререквизиты:
 
@@ -25,6 +25,7 @@ cd p-way-merge
 mkdir build && cd build 
 cmake -DCMAKE_BUILD_TYPE=Debug ..
 cmake --build . --target merge_test_ut
+./merge_test_ut
 ```
 
 На данный момент работают тесты merge_test, pack_test и simd_two_way_vector_resource_test.
