@@ -16,9 +16,6 @@
 #include <vector>
 namespace pmerge::multi_way {
 namespace detail {
-template <typename T>
-concept RandomAccessResourceIterator =
-    std::random_access_iterator<T>;
 
 template <pmerge::Resource Resource, size_t Num>
 struct LoserTreeImpl {
@@ -27,8 +24,6 @@ struct LoserTreeImpl {
       typename LoserTreeImpl<Resource, Num - Num / 2>::Type>;
   template <typename Iter>
   static Type Make(Iter it) {
-    static_assert(RandomAccessResourceIterator<Iter>);
-    static_assert(std::constructible_from<Resource,const typename Iter::value_type&>);
     static_assert(Num >= 2);
     return Type{LoserTreeImpl<Resource, Num / 2>::Make(it),
                 LoserTreeImpl<Resource, Num - Num / 2>::Make(it + Num / 2)};
@@ -40,7 +35,6 @@ struct LoserTreeImpl<Resource, 1> {
   using Type = Resource;
   template <typename Iter>
   static Type Make(Iter value) {
-    static_assert(RandomAccessResourceIterator<Iter>);
     return Type{*value};
   }
 };
@@ -56,7 +50,6 @@ template <pmerge::Resource ThisResource, size_t ResourcesAmount,
 LoserTree<ThisResource, ResourcesAmount>
 MakeLoserTree(const Data& range) {
   using DataType = std::ranges::range_value_t<Data>;
-
   static_assert(std::constructible_from<ThisResource, const DataType&>,
                 "cannot construct Resource from const Data::value_type&");
   return detail::LoserTreeImpl<ThisResource, ResourcesAmount>::Make(
