@@ -16,11 +16,22 @@ target_compile_options(pmerge PUBLIC "-mavx2")
 target_compile_options(pmerge PUBLIC "-fsanitize=address,undefined")
 target_link_options(pmerge PUBLIC "-fsanitize=address,undefined")
 
+set(WORKING_TESTS "merge_test;pack_test;simd_two_way_vector_resource_test" LIST)
+
 target_include_directories(pmerge PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include")
-add_compile_options()
+
+enable_testing()
+
+add_custom_target(working_tests)
+
 foreach (test ${PMERGE_TESTS})
     get_filename_component(filename ${test} NAME_WE)
     add_executable(${filename}_ut ${test})
     target_link_libraries(${filename}_ut pmerge)
     target_link_libraries(${filename}_ut GTest::gtest_main)
+    if ("${filename}" IN_LIST WORKING_TESTS)
+        gtest_discover_tests(${filename}_ut)
+        add_dependencies(working_tests ${filename}_ut)
+    endif()
 endforeach()
+

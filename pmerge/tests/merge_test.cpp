@@ -10,7 +10,7 @@
 
 #include "utils.hpp"
 
-TEST(Simd, MergeSimple) {
+TEST(SimdInregisterMerge, MergeSimple) {
   auto reg_odd = pmerge::simd::MakeFrom(1, 3, 5, 7);
   auto reg_even = pmerge::simd::MakeFrom(2, 4, 6, 8);
   PMERGE_MERGE(reg_even, reg_odd);
@@ -18,7 +18,7 @@ TEST(Simd, MergeSimple) {
   ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, reg_odd, pmerge::simd::MakeFrom(5, 6, 7, 8));
 }
 
-TEST(Simd, CompleteEnumerationNoEqualElements) {
+TEST(SimdInregisterMerge, CompleteEnumerationNoEqualElements) {
   ForEachPermutationsOfRegisters([](__m256i vMin, __m256i vMax) {
     PMERGE_MERGE(vMin, vMax);
     ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, vMin, pmerge::simd::MakeFrom(1, 2, 3, 4));
@@ -26,7 +26,7 @@ TEST(Simd, CompleteEnumerationNoEqualElements) {
   });
 }
 
-TEST(Simd, CompleteEnumerationNoEqualElementsButBig) {
+TEST(SimdInregisterMerge, CompleteEnumerationNoEqualElementsWithInfinities) {
   ForEachPermutationsOfRegisters([](__m256i vMin, __m256i vMax) {
     auto mask = pmerge::simd::MakeFrom(0, 0, pmerge::kInf, pmerge::kInf);
     PMERGE_MINMAX(mask, vMin);
@@ -41,7 +41,7 @@ TEST(Simd, CompleteEnumerationNoEqualElementsButBig) {
   });
 }
 
-TEST(Simd, MinMax) {
+TEST(SimdInregisterMinMax, Simple) {
   auto reg_bigger = pmerge::simd::MakeFrom(1, 1, 4, 4);
   auto reg_smaller = pmerge::simd::MakeFrom(3, 3, 2, 2);
 
@@ -52,7 +52,7 @@ TEST(Simd, MinMax) {
       << pmerge::simd::ToString(reg_bigger);
 }
 
-TEST(Simd, GetSingleUInt64) {
+TEST(SimdMakeFrom, GetSingleUInt64) {
   auto reg = pmerge::simd::MakeFrom(1, 2, 3, 4);
   ASSERT_EQ(pmerge::simd::Get64MostSignificantBits(reg), 1);
 }

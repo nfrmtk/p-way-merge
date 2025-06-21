@@ -5,8 +5,8 @@
 
 #include <cstdio>
 #include <pmerge/common/resource.hpp>
-#include <vector>
-TEST(Pack, Simple) {
+
+TEST(BitPacking, Simple) {
   uint64_t num = 63;
   std::bitset<0> b = 0;
   ASSERT_EQ(pmerge::PackFrom(num, b), 31 + std::numeric_limits<int64_t>::min());

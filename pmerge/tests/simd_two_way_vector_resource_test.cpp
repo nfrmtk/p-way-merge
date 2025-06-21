@@ -62,12 +62,12 @@ void TestMerge(const std::vector<int64_t>& first_vec,
   ASSERT_EQ(merger.Peek(), pmerge::kInf) << "not all values from merger checked";
 }
 
-TEST(Merge, Simple) {
+TEST(TwoWayMergeVectorResource, Simple) {
   TestMerge(FromDataAndIndex(std::vector<uint64_t>({1, 7, 9, 11, 32}), kFirstIdentifier),
             FromDataAndIndex(std::vector<uint64_t>({2, 3, 4, 5, 32}), kSecondIdentifier), true);
 }
 
-TEST(Merge, Random) {
+TEST(TwoWayMergeVectorResource, Random) {
   std::mt19937 random(123);
   std::vector<uint64_t> first, second;
   first.resize(1000);
