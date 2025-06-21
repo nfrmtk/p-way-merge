@@ -18,7 +18,7 @@ TEST(Simd, MergeSimple) {
   ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, reg_odd, pmerge::simd::MakeFrom(5, 6, 7, 8));
 }
 
-TEST(Simd, CompleteEnumerationNoEqualElements) {
+TEST(SimdInregisterMerge, CompleteEnumerationNoEqualElements) {
   ForEachPermutationsOfRegisters([](__m256i vMin, __m256i vMax) {
     PMERGE_MERGE(vMin, vMax);
     ASSERT_PRED2(pmerge::simd::CompareRegistersEqual, vMin, pmerge::simd::MakeFrom(1, 2, 3, 4));
@@ -26,7 +26,7 @@ TEST(Simd, CompleteEnumerationNoEqualElements) {
   });
 }
 
-TEST(Simd, CompleteEnumerationNoEqualElementsButBig) {
+TEST(SimdInregisterMerge, CompleteEnumerationNoEqualElementsWithInfinities) {
   ForEachPermutationsOfRegisters([](__m256i vMin, __m256i vMax) {
     auto mask = pmerge::simd::MakeFrom(0, 0, pmerge::kInf, pmerge::kInf);
     PMERGE_MINMAX(mask, vMin);
