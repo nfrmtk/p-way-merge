@@ -7,17 +7,15 @@
 #include <immintrin.h>
 
 #include <bit>
+#include <concepts>
 #include <cstdint>
+#include <iterator>
 #include <pmerge/common/resource.hpp>
 #include <pmerge/two_way/simd_two_way.hpp>
 #include <span>
 #include <vector>
 namespace pmerge::multi_way {
 namespace detail {
-template <typename T>
-concept RandomAccessResourceIterator =
-    std::ranges::random_access_range<T> &&
-    pmerge::Resource<std::ranges::range_value_t<T>>;
 
 template <pmerge::Resource Resource, size_t Num>
 struct LoserTreeImpl {
@@ -26,7 +24,6 @@ struct LoserTreeImpl {
       typename LoserTreeImpl<Resource, Num - Num / 2>::Type>;
   template <typename Iter>
   static Type Make(Iter it) {
-    static_assert(RandomAccessResourceIterator<Iter>);
     static_assert(Num >= 2);
     return Type{LoserTreeImpl<Resource, Num / 2>::Make(it),
                 LoserTreeImpl<Resource, Num - Num / 2>::Make(it + Num / 2)};
@@ -38,7 +35,6 @@ struct LoserTreeImpl<Resource, 1> {
   using Type = Resource;
   template <typename Iter>
   static Type Make(Iter value) {
-    static_assert(RandomAccessResourceIterator<Iter>);
     return Type{*value};
   }
 };
@@ -49,14 +45,14 @@ template <pmerge::Resource Resource, size_t ResourcesAmount>
 using LoserTree =
     typename detail::LoserTreeImpl<Resource, ResourcesAmount>::Type;
 
-template <size_t ResourcesAmount,
-          std::ranges::random_access_range ResourceRange>
-LoserTree<std::ranges::range_value_t<ResourceRange>, ResourcesAmount>
-MakeLoserTree(ResourceRange&& range) {
-  static_assert(detail::RandomAccessResourceIterator<ResourceRange>,
-                "ResourceRange is range over resources");
-  using ResourceType = std::ranges::range_value_t<ResourceRange>;
-  return detail::LoserTreeImpl<ResourceType, ResourcesAmount>::Make(
+template <pmerge::Resource ThisResource, size_t ResourcesAmount,
+          std::ranges::random_access_range Data>
+LoserTree<ThisResource, ResourcesAmount>
+MakeLoserTree(const Data& range) {
+  using DataType = std::ranges::range_value_t<Data>;
+  static_assert(std::constructible_from<ThisResource, const DataType&>,
+                "cannot construct Resource from const Data::value_type&");
+  return detail::LoserTreeImpl<ThisResource, ResourcesAmount>::Make(
       range.begin());
 }
 
