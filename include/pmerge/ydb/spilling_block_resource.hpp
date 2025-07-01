@@ -87,11 +87,16 @@ class SpillingBlockBufferedResource {
         pmerge::Resource<
             pmerge::ydb::SpillingBlockBufferedResource<IndexSizeBits>>,
         "SpillingBlockResource must be resource");
-    std::cout << "SpillingBlockResource ctor finished\n"; 
+    std::cout << "SpillingBlockResource ctor finished\n";
   }
-  IntermediateInteger Peek() const { return simd::Get64MostSignificantBits(current_vec_); }
+  IntermediateInteger Peek() const {
+    return simd::Get64MostSignificantBits(current_vec_);
+  }
   __m256i GetOne() {
-    PMERGE_ASSERT_M(IsValid(pmerge::simd::Get64MostSignificantBits(current_vec_)), "SpillingBlockBufferedResource::GetOne should be called with current_vec_ being valid");
+    PMERGE_ASSERT_M(
+        IsValid(pmerge::simd::Get64MostSignificantBits(current_vec_)),
+        "SpillingBlockBufferedResource::GetOne should be called with "
+        "current_vec_ being valid");
     auto next = GetOneHelper();
     std::cout << "SpillingBlockBufferedResource::GetOne another array: "
               << simd::ToString(next) << '\n';
@@ -103,7 +108,9 @@ class SpillingBlockBufferedResource {
 
  private:
   __m256i GetOneHelper() {
-    std::cout << std::format("currently_processed_slots_: {}, total_slots_: {}", currently_processed_slots_, total_slots_) << std::endl;
+    std::cout << std::format("currently_processed_slots_: {}, total_slots_: {}",
+                             currently_processed_slots_, total_slots_)
+              << std::endl;
     if (currently_processed_slots_ >= total_slots_) {
       return simd::kInfVector;
     }

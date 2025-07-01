@@ -29,7 +29,6 @@ inline SlotView GetSlot(std::span<uint64_t>& buffer) {
   return ret;
 }
 
-
 inline ConstSlotView GetConstSlot(std::span<const uint64_t>& buffer) {
   ConstSlotView ret = buffer.subspan<0, 8>();
   buffer = buffer.subspan<8>();

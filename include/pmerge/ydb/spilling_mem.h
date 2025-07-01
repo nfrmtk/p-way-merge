@@ -6,7 +6,7 @@
 class TSpillingBlock {
 public:
   TSpillingBlock(void* external_memory, ui64 block_size, ui64 data):ExternalMemory(external_memory), BlockSize(block_size), Data(data) {
-    assert(BlockSize%(64*4) == 0 && "BlockSize must be splittable in pmerge::ydb::Slot's");
+    PMERGE_ASSERT_M(BlockSize%(64*4) == 0, std::format("BlockSize(={}) must be splittable in pmerge::ydb::Slot's", BlockSize));
   }
 
     void* ExternalMemory;

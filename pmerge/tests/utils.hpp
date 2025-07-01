@@ -7,12 +7,13 @@
 
 #include <immintrin.h>
 #include <pmerge/ydb/spilling_mem.h>
-#include <pmerge/common/print.hpp>
+
 #include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <numeric>
 #include <ostream>
+#include <pmerge/common/print.hpp>
 #include <pmerge/simd/utils.hpp>
 #include <random>
 #include <type_traits>
@@ -106,9 +107,6 @@ TSpillingBlock MakeRandomSlotsBlock(TSpilling& stats, std::mt19937_64& gen,
 template <uint32_t keySize>
 TSpillingBlock MakeSlotsBlock(TSpilling& stats, auto keys_gen, auto counts_gen,
                               int64_t size_slots) {
-  const int64_t size_nums = size_slots * 8;
-  std::uniform_int_distribution<uint64_t> nums(0);
-  std::uniform_int_distribution<uint64_t> counts(0, 10);
   auto storage = std::make_unique<Slot[]>(size_slots);
   for (int idx = 0; idx < size_slots; idx++) {
     Slot* this_slot = storage.get() + idx;
@@ -141,9 +139,16 @@ inline std::vector<uint64_t> MakeBuffer(int size_slots) {
   return std::vector<uint64_t>(size_slots * 8, 0);
 }
 
+std::string RangeToString(std::ranges::range auto&& range) {
+  std::string str;
+  for (const auto& val : range) {
+    str += std::format("{}", val);
+  }
+  return str;
+}
+
 void PrintIntermediateIntegersRange(std::ranges::range auto&& range) {
   for (const auto& num : range) {
-
     pmerge::utils::PrintIfDebug(pmerge::MakeReadableString(num) + ' ');
   }
   std::cout << std::endl;
