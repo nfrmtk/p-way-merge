@@ -19,7 +19,7 @@ class SpillingBlocksBuffer {
         external_memory_(external_memory),
         buffer_(buffer) {
     PMERGE_ASSERT_M(external_memory_.BlockSize % buffer_.size_bytes() == 0,
-                  "external memory should be spilttable by buffers");
+                    "external memory should be spilttable by buffers");
     AssertSplittableBySlots(buffer);
   }
   std::span<uint64_t> ResetBuffer() {
@@ -33,7 +33,6 @@ class SpillingBlocksBuffer {
   }
 
  private:
-
   TSpilling& spilling_;
   TSpillingBlock external_memory_;
   int64_t buffers_read_ = 0;

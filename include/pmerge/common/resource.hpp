@@ -19,7 +19,7 @@ template <typename T>
 concept Resource = requires(T t) {
   t.GetOne();
   { t.Peek() } -> std::same_as<IntermediateInteger>;
-// } && std::copyable<T>;
+  // } && std::copyable<T>;
 };
 
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cmpgt_ep&ig_expand=4455,4419,1024,1024
@@ -36,9 +36,7 @@ inline bool IsValid(IntermediateInteger integer) {
 template <uint64_t IndexSize>
 IntermediateInteger PackFrom(uint64_t num, std::bitset<IndexSize> index) {
   static_assert(IndexSize <= 10, "index must be small");
-  constexpr int64_t kMaxTakenBits = 1ll << (64 - IndexSize - 1);
   uint64_t taken_bits = (num >> (IndexSize + 1)) << IndexSize;
-  assert(taken_bits >= 0 && ((IndexSize == 0) || taken_bits < kMaxTakenBits) && taken_bits%(1<<IndexSize) == 0);
   constexpr uint64_t kMaxIndex = 1ull << IndexSize;
   assert(index.to_ullong() < kMaxIndex);
   assert((index.to_ullong() & (taken_bits << IndexSize)) == 0);
@@ -59,17 +57,18 @@ template <size_t IndexSize>
 std::optional<std::bitset<IndexSize>> ExtractIdentifer(
     IntermediateInteger num) {
   PMERGE_ASSERT_M(IsValid(num),
-                "Extracting identifier from invalid or infinite number {}");
+                  "Extracting identifier from invalid or infinite number {}");
   if (num == kInf) {
     return std::nullopt;
   }
-  return std::make_optional<std::bitset<IndexSize>>(num & ((1 << IndexSize )- 1));
+  return std::make_optional<std::bitset<IndexSize>>(num &
+                                                    ((1 << IndexSize) - 1));
 }
 
 template <size_t IndexSize>
 std::optional<uint64_t> ExtractCutHash(IntermediateInteger num) {
   PMERGE_ASSERT_M(IsValid(num),
-                "Extracting identifier from invalid or infinite number {}");
+                  "Extracting identifier from invalid or infinite number {}");
   if (num == kInf) {
     return std::nullopt;
   } else {

@@ -6,32 +6,33 @@
 #define UTILS_HPP
 
 #include <immintrin.h>
-
+#include <pmerge/ydb/spilling_mem.h>
+#include <pmerge/common/print.hpp>
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <numeric>
 #include <ostream>
-#include <random>
-#include <vector>
-#include <pmerge/ydb/spilling_mem.h>
 #include <pmerge/simd/utils.hpp>
+#include <random>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "pmerge/common/assert.hpp"
+#include "pmerge/common/resource.hpp"
+#include "pmerge/ydb/types.hpp"
 namespace std {
 inline std::ostream& operator<<(std::ostream& os, __m256i reg) {
   os << pmerge::simd::ToString(reg);
   return os;
 }
 }  // namespace std
+namespace pmerge::ydb {
 
-TSpillingBlock Make(TSpilling& stats, std::mt19937_64& gen, uint64_t size_blocks){
-  
-  auto storage = std::make_unique<uint64_t[]>(size_blocks);
-  std::uniform_int_distribution<uint64_t> keys_distr()
-  for()
-}
-
-
-template<ui32 keyCount>
-bool Equal(std::span<const pmerge::ydb::Slot, keyCount>first, std::span<const pmerge::ydb::Slot, keyCount>second ) {
+template <ui64 keyCount>
+bool Equal(pmerge::ydb::Key<keyCount> first,
+           pmerge::ydb::Key<keyCount> second) {
   for (int idx = 0; idx < keyCount; ++idx) {
     if (first[idx] != second[idx]) {
       return false;
@@ -40,8 +41,9 @@ bool Equal(std::span<const pmerge::ydb::Slot, keyCount>first, std::span<const pm
   return true;
 }
 
-template<ui32 keyCount>
-bool Less(std::span<const pmerge::ydb::Slot, keyCount>first, std::span<const pmerge::ydb::Slot, keyCount>second ) {
+template <ui64 keyCount>
+bool LexicographicallyLess(pmerge::ydb::Key<keyCount> first,
+                           pmerge::ydb::Key<keyCount> second) {
   for (int idx = 0; idx < keyCount; ++idx) {
     if (first[idx] > second[idx]) {
       return false;
@@ -53,34 +55,99 @@ bool Less(std::span<const pmerge::ydb::Slot, keyCount>first, std::span<const pme
   return false;
 }
 
-// it is transitive: for all a, b and c, if r(a, b) and r(b, c) are both true then r(a, c) is true;
-// a = (2, 123, 4)
-// b = (1, 3, 7)
-// c = (1, 4, 312)
-// a > c > b 
-
-template<ui32 keyCount>
+// SlotLess satisfies strict weak ordering.
+template <ui64 keyCount>
 bool SlotLess(const pmerge::ydb::Slot& first, const pmerge::ydb::Slot& second) {
+  using pmerge::ydb::AsView;
+  using pmerge::ydb::GetKey;
+  auto first_view = AsView(first);
+  auto second_view = AsView(first);
   if (pmerge::ydb::GetHash(first) < pmerge::ydb::GetHash(second)) {
     return true;
   }
   if (pmerge::ydb::GetHash(first) > pmerge::ydb::GetHash(second)) {
     return false;
   }
-  auto first_span = pmerge::ydb::GetKey<keyCount>(first);
-  auto second_span = pmerge::ydb::GetKey<keyCount>(second);
-  if (Equal(first_span, second_span)) {
+  auto first_key = GetKey<keyCount>(first_view);
+  auto second_key = GetKey<keyCount>(second_view);
+  if (Equal(first_key, second_key)) {
     return false;
   }
-  if (Less(first_span, second_span) ) {
+  if (LexicographicallyLess(first_key, second_key)) {
     return true;
-  }else {
-    PMERGE_ASSERT(std::ranges::lexicographical_compare(second_span, first_span));
+  } else {
+    PMERGE_ASSERT(std::ranges::lexicographical_compare(second_key, first_key));
     return false;
   }
 }
 
+template <auto keySize>
+uint64_t Hash(pmerge::ydb::Key<keySize> key) {
+  return std::accumulate(key.begin(), key.end(), 0ull);
+}
 
+template <uint32_t keySize>
+TSpillingBlock MakeRandomSlotsBlock(TSpilling& stats, std::mt19937_64& gen,
+                                    uint64_t size_slots) {
+  const int64_t size_nums = size_slots * 8;
+  std::uniform_int_distribution<uint64_t> nums(0);
+  std::uniform_int_distribution<uint64_t> counts(0, 10);
+  auto storage = std::make_unique<Slot[]>(size_slots);
+  for (int idx = 0; idx < size_slots; idx++) {
+    Slot* this_slot = storage.get() + idx;
+    std::generate_n(&this_slot->nums[1], keySize, [&] { return nums(gen); });
+    this_slot->nums[0] =
+        Hash(pmerge::ydb::GetKey<keySize>(ConstSlotView{this_slot->nums}));
+    this_slot->nums[7] = counts(gen);
+  }
+  std::sort(storage.get(), storage.get() + size_slots, SlotLess<keySize>);
+  return stats.Save(storage.get(), size_slots * 64, 0);
+}
+template <uint32_t keySize>
+TSpillingBlock MakeSlotsBlock(TSpilling& stats, auto keys_gen, auto counts_gen,
+                              int64_t size_slots) {
+  const int64_t size_nums = size_slots * 8;
+  std::uniform_int_distribution<uint64_t> nums(0);
+  std::uniform_int_distribution<uint64_t> counts(0, 10);
+  auto storage = std::make_unique<Slot[]>(size_slots);
+  for (int idx = 0; idx < size_slots; idx++) {
+    Slot* this_slot = storage.get() + idx;
+    std::generate_n(&this_slot->nums[1], keySize, [&] { return keys_gen(); });
+    this_slot->nums[0] =
+        Hash(pmerge::ydb::GetKey<keySize>(ConstSlotView{this_slot->nums}));
+    this_slot->nums[7] = counts_gen();
+  }
+  std::sort(storage.get(), storage.get() + size_slots, SlotLess<keySize>);
+  return stats.Save(storage.get(), size_slots * 64, 0);
+}
+template <typename Value>
+std::span<Value> AsSpan(TSpillingBlock& block) {
+  PMERGE_ASSERT(block.BlockSize % sizeof(Value) == 0);
+  return std::span{static_cast<Value*>(block.ExternalMemory),
+                   static_cast<Value*>(block.ExternalMemory) +
+                       block.BlockSize / sizeof(Value)};
+}
+
+template <typename T>
+TSpillingBlock MakeSpillingBlock(const std::unique_ptr<T>& pointer,
+                                 int64_t size) {
+  return TSpillingBlock{pointer.get(),
+                        size * sizeof(std::remove_all_extents_t<T>), 0};
+}
+
+}  // namespace pmerge::ydb
+
+inline std::vector<uint64_t> MakeBuffer(int size_slots) {
+  return std::vector<uint64_t>(size_slots * 8, 0);
+}
+
+void PrintIntermediateIntegersRange(std::ranges::range auto&& range) {
+  for (const auto& num : range) {
+
+    pmerge::utils::PrintIfDebug(pmerge::MakeReadableString(num) + ' ');
+  }
+  std::cout << std::endl;
+}
 
 inline void GetComplimentary(const uint64_t* arr, uint64_t* dst) {
   int out_idx = 0;
@@ -92,6 +159,18 @@ inline void GetComplimentary(const uint64_t* arr, uint64_t* dst) {
     }
   }
 }
+
+template <typename F>
+class Defer {
+ public:
+  Defer(F&& f) : fun_(std::forward<F>(f)) {
+    static_assert(std::is_nothrow_invocable_v<F>);
+  }
+  ~Defer() { fun_(); }
+
+ private:
+  F fun_;
+};
 
 template <typename Callback>
 void ForEachPermutationsOfRegisters(Callback cb) {

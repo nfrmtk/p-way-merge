@@ -17,8 +17,8 @@ TEST(LoserTree, SimpleDepthTwo) {
       FromDataAndIndex(std::vector<uint64_t>{1, 2, 3, 4}, std::bitset<2>(0)));
   vectors.emplace_back(
       FromDataAndIndex(std::vector<uint64_t>{5, 5, 6, 6}, std::bitset<2>(1)));
-  vectors.emplace_back(
-      FromDataAndIndex(std::vector<uint64_t>{7, 10, 13, 54}, std::bitset<2>(2)));
+  vectors.emplace_back(FromDataAndIndex(std::vector<uint64_t>{7, 10, 13, 54},
+                                        std::bitset<2>(2)));
   vectors.emplace_back(
       FromDataAndIndex(std::vector<uint64_t>{1, 2, 3, 4}, std::bitset<2>(3)));
 
@@ -28,7 +28,9 @@ TEST(LoserTree, SimpleDepthTwo) {
   resources.emplace_back(vectors[1]);
   resources.emplace_back(vectors[2]);
   resources.emplace_back(vectors[3]);
-  TreeDepthTwo tree = pmerge::multi_way::MakeLoserTree<pmerge::common::VectorResource, 4>(vectors);
+  TreeDepthTwo tree =
+      pmerge::multi_way::MakeLoserTree<pmerge::common::VectorResource, 4>(
+          vectors);
   std::vector<int64_t> result_tree;
   while (tree.Peek() != pmerge::kInf) {
     auto arr = pmerge::simd::AsArray(tree.GetOne());

@@ -47,8 +47,7 @@ using LoserTree =
 
 template <pmerge::Resource ThisResource, size_t ResourcesAmount,
           std::ranges::random_access_range Data>
-LoserTree<ThisResource, ResourcesAmount>
-MakeLoserTree(const Data& range) {
+LoserTree<ThisResource, ResourcesAmount> MakeLoserTree(const Data& range) {
   using DataType = std::ranges::range_value_t<Data>;
   static_assert(std::constructible_from<ThisResource, const DataType&>,
                 "cannot construct Resource from const Data::value_type&");

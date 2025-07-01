@@ -6,6 +6,7 @@
 #define MRGE_REFERENCE_HPP
 
 #include <pmerge/ydb/spilling_mem.h>
+
 #include <deque>
 #include <iosfwd>
 #include <string_view>
@@ -14,121 +15,120 @@ constexpr ui32 slotSize = 8;
 
 template <ui32 keyCount>
 struct TInputData {
+  TInputData() {}
 
-    TInputData() {
+  TInputData(TSpillingBlock block, ui64 *buffer, ui64 bufferSize) {
+    Init(block, buffer, bufferSize);
+  }
 
+  void Init(TSpillingBlock block, ui64 *buffer, ui64 bufferSize) {
+    Block = block;
+    Offset = 0;
+    Count = 0;
+    Size = Block.BlockSize / (slotSize * 8);
+    Buffer = buffer;
+    BufferSize = bufferSize;
+    Record = Buffer;
+    EndOfBuffer = Buffer;
+  }
+
+  bool Next(TSpilling &sp) {
+    while (true) {
+      while (Record < EndOfBuffer && Record[slotSize - 1] == 0) {
+        Record += slotSize;
+      }
+
+      if (Record < EndOfBuffer) {
+        return true;
+      }
+
+      if (Offset == Size) {
+        return false;
+      }
+
+      Count = std::min(BufferSize, Size - Offset);
+      sp.Load(Block, Offset * slotSize * 8, Buffer, Count * slotSize * 8);
+      Offset += Count;
+      Record = Buffer;
+      EndOfBuffer = Buffer + Count * slotSize;
     }
+  }
 
-    TInputData(TSpillingBlock block, ui64 *buffer, ui64 bufferSize) {
-        Init(block, buffer, bufferSize);
+  inline ui32 Compare(ui64 *&record, ui64 &count, ui32 mask, ui32 ownMask) {
+    if (Record >= EndOfBuffer) {
+      return mask;
     }
+    if (mask == 0) {
+      count = Record[slotSize - 1];
+      record = Record;
+      return ownMask;
+    } else {
+      if (record[0] < Record[0]) {
+        return mask;
+      } else if (record[0] > Record[0]) {
+        count = Record[slotSize - 1];
+        record = Record;
+        return ownMask;
+      }
 
-    void Init(TSpillingBlock block, ui64 *buffer, ui64 bufferSize) {
-        Block = block;
-        Offset = 0;
-        Count = 0;
-        Size = Block.BlockSize / (slotSize * 8);
-        Buffer = buffer;
-        BufferSize = bufferSize;
-        Record = Buffer;
-        EndOfBuffer = Buffer;
-    }
+      // record[0] == Record[0]
 
-    bool Next(TSpilling& sp) {
-        while (true) {
-            while (Record < EndOfBuffer && Record[slotSize - 1] == 0) {
-                Record += slotSize;
-            }
-
-            if (Record < EndOfBuffer) {
-                return true;
-            }
-
-            if (Offset == Size) {
-                return false;
-            }
-
-            Count = std::min(BufferSize, Size - Offset);
-            sp.Load(Block, Offset * slotSize * 8, Buffer, Count * slotSize * 8);
-            Offset += Count;
-            Record = Buffer;
-            EndOfBuffer = Buffer + Count * slotSize;
+      if constexpr (keyCount == 1) {
+        if (record[1] == Record[1]) {
+          count += Record[slotSize - 1];
+          return (mask | ownMask);
         }
-    }
-
-    inline ui32 Compare(ui64 *& record, ui64& count, ui32 mask, ui32 ownMask) {
-        if (Record >= EndOfBuffer) {
-            return mask;
+      } else if constexpr (keyCount == 2) {
+        if (record[1] == Record[1] && record[2] == Record[2]) {
+          count += Record[slotSize - 1];
+          return (mask | ownMask);
         }
-        if (mask == 0) {
-            count = Record[slotSize - 1];
-            record = Record;
-            return ownMask;
-        } else {
-            if (record[0] < Record[0]) {
-                return mask;
-            } else if (record[0] > Record[0]) {
-                count = Record[slotSize - 1];
-                record = Record;
-                return ownMask;
-            }
-
-            // record[0] == Record[0]
-
-            if constexpr (keyCount == 1) {
-                if (record[1] == Record[1]) {
-                    count += Record[slotSize - 1];
-                    return (mask | ownMask);
-                }
-            } else if constexpr (keyCount == 2) {
-                if (record[1] == Record[1] && record[2] == Record[2]) {
-                    count += Record[slotSize - 1];
-                    return (mask | ownMask);
-                }
-            } else if constexpr (keyCount == 3) {
-                if (record[1] == Record[1] && record[2] == Record[2] && record[3] == Record[3]) {
-                    count += Record[slotSize - 1];
-                    return (mask | ownMask);
-                }
-            } else if constexpr (keyCount == 4) {
-                if (record[1] == Record[1] && record[2] == Record[2] && record[3] == Record[3] && record[4] == Record[4]) {
-                    count += Record[slotSize - 1];
-                    return (mask | ownMask);
-                }
-            }
-
-            for (ui32 i = 1; i < keyCount + 1; i++) {
-                if (record[i] < Record[i]) {
-                    return mask;
-                } else if (record[i] > Record[i]) {
-                    count = Record[slotSize - 1];
-                    record = Record;
-                    return ownMask;
-                }
-            }
-
-            count += Record[slotSize - 1];
-            return (mask | ownMask);
+      } else if constexpr (keyCount == 3) {
+        if (record[1] == Record[1] && record[2] == Record[2] &&
+            record[3] == Record[3]) {
+          count += Record[slotSize - 1];
+          return (mask | ownMask);
         }
-    }
+      } else if constexpr (keyCount == 4) {
+        if (record[1] == Record[1] && record[2] == Record[2] &&
+            record[3] == Record[3] && record[4] == Record[4]) {
+          count += Record[slotSize - 1];
+          return (mask | ownMask);
+        }
+      }
 
-    inline void IncIfUse(ui32 mask, ui32 ownMask) {
-        Record += ((mask & ownMask) != 0) * slotSize;
-    }
+      for (ui32 i = 1; i < keyCount + 1; i++) {
+        if (record[i] < Record[i]) {
+          return mask;
+        } else if (record[i] > Record[i]) {
+          count = Record[slotSize - 1];
+          record = Record;
+          return ownMask;
+        }
+      }
 
-    TSpillingBlock Block;
-    ui64 *Buffer;
-    ui64 *Record;
-    ui64 *EndOfBuffer;
-    ui64 BufferSize;
-    ui64 Offset;
-    ui64 Count;
-    ui64 Size;
+      count += Record[slotSize - 1];
+      return (mask | ownMask);
+    }
+  }
+
+  inline void IncIfUse(ui32 mask, ui32 ownMask) {
+    Record += ((mask & ownMask) != 0) * slotSize;
+  }
+
+  TSpillingBlock Block;
+  ui64 *Buffer;
+  ui64 *Record;
+  ui64 *EndOfBuffer;
+  ui64 BufferSize;
+  ui64 Offset;
+  ui64 Count;
+  ui64 Size;
 };
 namespace ydb_reference {
 template <bool finalize, ui32 keyCount, ui32 p>
-ui32 merge2pway(ui64 * partBuffer, ui32 partBufferSize, TSpilling& sp, std::deque<TSpillingBlock>& spills) {
-
+ui32 merge2pway(ui64 *partBuffer, ui32 partBufferSize, TSpilling &sp,
+                std::deque<TSpillingBlock> &spills) {
   constexpr ui32 n = 1ul << p;
   auto inputBufferSize = partBufferSize >> (p + 1);
   auto mergeBufferSize = partBufferSize >> 1;
@@ -147,7 +147,6 @@ ui32 merge2pway(ui64 * partBuffer, ui32 partBufferSize, TSpilling& sp, std::dequ
   ui32 result = 0;
 
   while (true) {
-
     auto notEmpty = false;
     for (ui32 i = 0; i < n; i++) {
       notEmpty |= data[i].Next(sp);
@@ -158,7 +157,7 @@ ui32 merge2pway(ui64 * partBuffer, ui32 partBufferSize, TSpilling& sp, std::dequ
     }
 
     ui64 count = 0;
-    ui64 * record = nullptr;
+    ui64 *record = nullptr;
 
     ui32 use = 0;
     for (ui32 i = 0; i < n; i++) {
@@ -203,5 +202,5 @@ ui32 merge2pway(ui64 * partBuffer, ui32 partBufferSize, TSpilling& sp, std::dequ
 
   return result;
 }
-}
-#endif //MRGE_REFERENCE_HPP
+}  // namespace ydb_reference
+#endif  // MRGE_REFERENCE_HPP

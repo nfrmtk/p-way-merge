@@ -7,6 +7,7 @@
 #include <pmerge/ydb/spilling_mem.h>
 
 #include <bitset>
+#include <format>
 #include <pmerge/common/assert.hpp>
 #include <pmerge/common/resource.hpp>
 #include <pmerge/ydb/spilling_block_reader.hpp>
@@ -77,58 +78,58 @@ class SpillingBlockBufferedResource {
   SpillingBlockBufferedResource(TSpilling& spilling, TSpillingBlock block,
                                 std::span<uint64_t> my_buffer,
                                 std::bitset<IndexSizeBits> resource_identifier)
-      :
-        resource_identifier_(resource_identifier),stats_(spilling),
+      : resource_identifier_(resource_identifier),
+        stats_(spilling),
         blocks_reader_(SpillingBlocksBuffer{spilling, block, my_buffer}),
-        current_num_(GetPackedInt()),
-        total_slots_(block.BlockSize>>8){
+        current_vec_(GetOneHelper()),
+        total_slots_(block.BlockSize >> 6) {
     static_assert(
         pmerge::Resource<
             pmerge::ydb::SpillingBlockBufferedResource<IndexSizeBits>>,
         "SpillingBlockResource must be resource");
+    std::cout << "SpillingBlockResource ctor finished\n"; 
   }
-  IntermediateInteger Peek() const {
-    return current_num_;
-  }
+  IntermediateInteger Peek() const { return simd::Get64MostSignificantBits(current_vec_); }
   __m256i GetOne() {
+    PMERGE_ASSERT_M(IsValid(pmerge::simd::Get64MostSignificantBits(current_vec_)), "SpillingBlockBufferedResource::GetOne should be called with current_vec_ being valid");
     auto next = GetOneHelper();
-    // auto next = _mm256_loadu_si256(
-    //     reinterpret_cast<__m256i* const>(current_buffer_.data()));
     std::cout << "SpillingBlockBufferedResource::GetOne another array: "
               << simd::ToString(next) << '\n';
+    std::swap(next, current_vec_);
+    // auto next = _mm256_loadu_si256(
+    //     reinterpret_cast<__m256i* const>(current_buffer_.data()));
     return next;
   }
 
  private:
   __m256i GetOneHelper() {
+    std::cout << std::format("currently_processed_slots_: {}, total_slots_: {}", currently_processed_slots_, total_slots_) << std::endl;
     if (currently_processed_slots_ >= total_slots_) {
       return simd::kInfVector;
     }
-    if (currently_processed_slots_ + 4 >= total_slots_) { // once per this resource
+    if (currently_processed_slots_ + 4 >
+        total_slots_) {  // once per this resource
       IntermediateInteger pack[4] = {kInf, kInf, kInf, kInf};
-      pack[0] = current_num_;
       int slots_left = total_slots_ - currently_processed_slots_ - 1;
       PMERGE_ASSERT(slots_left >= 0);
-      PMERGE_ASSERT(slots_left <3);
+      PMERGE_ASSERT(slots_left < 3);
       for (int idx = 0; idx < slots_left; ++idx) {
-        pack[idx+1] = GetPackedInt();
+        pack[idx + 1] = GetPackedInt();
       }
-      current_num_ = kInf;
-      currently_processed_slots_ = total_slots_;
       return pmerge::simd::MakeFrom(pack[0], pack[1], pack[2], pack[3]);
     }
-    IntermediateInteger first = current_num_;
+    IntermediateInteger first = GetPackedInt();
     IntermediateInteger second = GetPackedInt();
     IntermediateInteger third = GetPackedInt();
     IntermediateInteger forth = GetPackedInt();
-    current_num_ = GetPackedInt();
-    currently_processed_slots_ += 4;
 
-    return pmerge::simd::MakeFrom(
-        first, second, third, forth);
-
+    return pmerge::simd::MakeFrom(first, second, third, forth);
   }
-  IntermediateInteger GetPackedInt() { return PackFrom(GetHash(blocks_reader_.AdvanceByOne()), resource_identifier_); }
+  IntermediateInteger GetPackedInt() {
+    currently_processed_slots_++;
+    return PackFrom(GetHash(blocks_reader_.AdvanceByOne()),
+                    resource_identifier_);
+  }
   // std::span<const Slot> ResetBuffer() {
   //   auto buff = blocks_buffer_.ResetBuffer();
   //   PMERGE_ASSERT(
@@ -142,9 +143,9 @@ class SpillingBlockBufferedResource {
   std::bitset<IndexSizeBits> resource_identifier_;
   TSpilling& stats_;
   SpillingBlockReader blocks_reader_;
-  IntermediateInteger current_num_;
   int64_t total_slots_;
   int64_t currently_processed_slots_ = 0;
+  __m256i current_vec_ = simd::kInfVector;
   // pmerge::ydb::SpillingBlocksBuffer blocks_buffer_;
   // std::span<uint64_t> current_buffer_;
 };
