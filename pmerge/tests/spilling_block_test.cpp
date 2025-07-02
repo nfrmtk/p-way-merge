@@ -87,18 +87,21 @@ void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
   TSpilling stats{kBlockSize};
   auto external_memory = pmerge::ydb::MakeSlotsBlock<KeySize>(
       stats, [cur = int{}, &key_data]() mutable { return key_data[cur++]; },
-      [] { return 0; }, key_data.size() / KeySize );
+      [] { return 0; }, key_data.size() / KeySize);
   Defer delete_external_mem = [&]() noexcept { stats.Delete(external_memory); };
   auto buffer = MakeBuffer(4);
   auto resource_index = std::bitset<1>{0};
-  std::vector<pmerge::IntermediateInteger> packed{key_data | std::views::chunk(KeySize) |
+  std::vector<pmerge::IntermediateInteger> packed{
+      key_data | std::views::chunk(KeySize) |
       std::views::transform([&](auto nums) {
         std::array<uint64_t, KeySize> keys{{}};
         for (int idx = 0; idx < KeySize; ++idx) {
           keys[idx] = nums[idx];
         }
-        return pmerge::PackFrom(pmerge::ydb::Hash(pmerge::ydb::Key<KeySize>{keys}), resource_index);
-      }) | std::ranges::to<std::vector<pmerge::IntermediateInteger>>()};
+        return pmerge::PackFrom(
+            pmerge::ydb::Hash(pmerge::ydb::Key<KeySize>{keys}), resource_index);
+      }) |
+      std::ranges::to<std::vector<pmerge::IntermediateInteger>>()};
   std::ranges::sort(packed);
   PrintIntermediateIntegersRange(packed);
   pmerge::ydb::SpillingBlockBufferedResource<1> resource{
