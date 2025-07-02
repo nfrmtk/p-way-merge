@@ -154,6 +154,9 @@ void PrintIntermediateIntegersRange(std::ranges::range auto&& range) {
   std::cout << std::endl;
 }
 
+template <typename T>
+void F() = delete;
+
 inline void GetComplimentary(const uint64_t* arr, uint64_t* dst) {
   int out_idx = 0;
   for (uint64_t num = 1; num <= 8; ++num) {

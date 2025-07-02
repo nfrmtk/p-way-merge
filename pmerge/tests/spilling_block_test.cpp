@@ -87,7 +87,7 @@ void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
   TSpilling stats{kBlockSize};
   auto external_memory = pmerge::ydb::MakeSlotsBlock<KeySize>(
       stats, [cur = int{}, &key_data]() mutable { return key_data[cur++]; },
-      [] { return 0; }, key_data.size());
+      [] { return 0; }, key_data.size() / KeySize );
   Defer delete_external_mem = [&]() noexcept { stats.Delete(external_memory); };
   auto buffer = MakeBuffer(4);
   auto resource_index = std::bitset<1>{0};
@@ -97,7 +97,7 @@ void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
         for (int idx = 0; idx < KeySize; ++idx) {
           keys[idx] = nums[idx];
         }
-        return pmerge::PackFrom(pmerge::ydb::Hash(pmerge::ydb::Key{keys}), resource_index);
+        return pmerge::PackFrom(pmerge::ydb::Hash(pmerge::ydb::Key<KeySize>{keys}), resource_index);
       }) | std::ranges::to<std::vector<pmerge::IntermediateInteger>>()};
   std::ranges::sort(packed);
   PrintIntermediateIntegersRange(packed);
