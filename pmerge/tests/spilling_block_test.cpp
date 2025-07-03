@@ -61,7 +61,7 @@ void TestResource(pmerge::Resource auto& tested_resouce,
 template <typename Number>
 class SpillingResourceSuite : public ::testing::Test{};
 
-using test_types = ::testing::Types<
+using test_key_sizes = ::testing::Types<
     std::integral_constant<std::size_t,1>,
     std::integral_constant<std::size_t,2>,
     std::integral_constant<std::size_t,3>, 
@@ -71,28 +71,9 @@ using test_types = ::testing::Types<
 static constexpr int kRandomSeed = 123;
 static constexpr int kBlockSize = 8 * 1024 * 1024;
 
-void TestSpillingBlockWithKeySizeOne(std::ranges::sized_range auto&& nums) {
-  constexpr int rem = 50 % 4;
-  PMERGE_ASSERT_M(std::ssize(nums) % 4 == 0,
-                  std::format("nums(size={}) must by splittable in groups of 4",
-                              std::ssize(nums)));
-  TSpilling stats{kBlockSize};
-  auto external_memory = pmerge::ydb::MakeSlotsBlock<1>(
-      stats, [cur = int{}, &nums]() mutable { return nums[cur++]; },
-      [] { return 0; }, nums.size());
-  Defer delete_external_mem = [&]() noexcept { stats.Delete(external_memory); };
-  auto buffer = MakeBuffer(4);
-  auto resource_index = std::bitset<1>{0};
-  auto expected = nums | std::views::transform([&](int num) {
-                    return pmerge::PackFrom(num, resource_index);
-                  });
-  PrintIntermediateIntegersRange(expected);
-  pmerge::ydb::SpillingBlockBufferedResource<1> resource{
-      stats, external_memory, std::span{buffer}, resource_index};
-  TestResource(resource, expected);
-}
 template <int KeySize>
 void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
+  auto resource_index{std::bitset<1>{0}};
   PMERGE_ASSERT_M(
       std::ssize(key_data) % (4 * KeySize) == 0,
       std::format("nums(size={}) must by splittable in groups of ({})",
@@ -103,7 +84,6 @@ void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
       [] { return 0; }, key_data.size() / KeySize);
   Defer delete_external_mem = [&]() noexcept { stats.Delete(external_memory); };
   auto buffer = MakeBuffer(4);
-  auto resource_index = std::bitset<1>{0};
   std::vector<pmerge::IntermediateInteger> packed{
       key_data | std::views::chunk(KeySize) |
       std::views::transform([&](auto nums) {
@@ -124,10 +104,10 @@ void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
 }
 
 TEST(SpillingBlockResource, simple) {
-  TestSpillingBlockWithKeySizeOne(std::vector{1, 3, 4, 8});
+  TestSpillingBlockResource<1>(std::vector{1, 3, 4, 8});
 }
 
-TYPED_TEST_SUITE(SpillingResourceSuite, test_types);
+TYPED_TEST_SUITE(SpillingResourceSuite, test_key_sizes);
 
 TYPED_TEST(SpillingResourceSuite, same_numbers) {
   static constexpr size_t kKeySize = TypeParam::value;
