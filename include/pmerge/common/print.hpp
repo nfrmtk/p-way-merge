@@ -3,11 +3,7 @@
 #include <ostream>
 #include <string_view>
 
-#if 1
 namespace pmerge {
-inline auto& output = std::cout;
-}
-#else
 struct noop_ostr {
   void flush() {}
 };
@@ -20,14 +16,42 @@ inline noop_ostr& operator<<(noop_ostr& __os,
                              std::ostream& (*f)(std::ostream&)) {
   return __os;
 }
-namespace pmerge {
-inline auto output = noop_ostr{};
+class Output {
+ public:
+  void Mute() { muted = true; }
+  void Unmute() { muted = false; }
+
+  friend Output& operator<<(Output& self, std::ostream& (*f)(std::ostream&));
+  template <typename T>
+  friend Output& operator<<(Output& self, const T& val);
+
+ private:
+  noop_ostr noop_;
+  bool muted = false;
+};
+template <typename T>
+Output& operator<<(Output& ostr, const T& val) {
+  if (!ostr.muted) {
+    std::cout << val;
+  }
+  return ostr;
 }
-#endif
+
+inline Output& operator<<(Output& ostr, std::ostream& (*f)(std::ostream&)) {
+  if (!ostr.muted) {
+    std::cout << f;
+  }
+  return ostr;
+}
+
+inline auto output = Output{};
+}  // namespace pmerge
 
 namespace pmerge::utils {
 inline void PrintIfDebug(std::string_view string) {
+#ifndef NDEBUG
   pmerge::output << string;
-  pmerge::output.flush();
+  pmerge::output << std::endl;
+#endif
 }
 }  // namespace pmerge::utils

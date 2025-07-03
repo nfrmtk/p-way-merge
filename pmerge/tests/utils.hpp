@@ -17,6 +17,7 @@
 #include <pmerge/common/print.hpp>
 #include <pmerge/simd/utils.hpp>
 #include <random>
+#include <ranges>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -227,7 +228,10 @@ inline void FillVector(std::vector<uint64_t>& vec, std::mt19937& random) {
 }
 
 inline std::vector<int64_t> SimpleMultiwayMerge(
-    const std::vector<std::vector<int64_t>>& nums) {
+    const std::ranges::range auto& nums)
+  requires std::same_as<std::vector<int64_t>,
+                        std::ranges::range_value_t<decltype(nums)>>
+{
   std::vector<int64_t> output;
   std::vector<int64_t> tmp;
   for (auto& vec : nums) {
@@ -237,6 +241,19 @@ inline std::vector<int64_t> SimpleMultiwayMerge(
   }
   return tmp;
 }
+
+inline auto MakeRandomGenerator(uint64_t low, uint64_t high,
+                                uint64_t seed = 123) {
+  struct Generator {
+    std::mt19937_64 rng{seed};
+    std::uniform_int_distribution<uint64_t> distr{low, high};
+    uint64_t operator()() noexcept { return distr(rng); }
+  };
+  return Generator{};
+}
+class UnmuteOnExitSuite : public ::testing::Test {
+  void TearDown() override { pmerge::output.Unmute(); }
+};
 
 std::vector<pmerge::IntermediateInteger> AsVector(
     pmerge::Resource auto& resource) {

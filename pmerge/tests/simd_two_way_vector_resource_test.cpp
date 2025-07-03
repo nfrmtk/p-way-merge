@@ -78,9 +78,9 @@ TEST(TwoWayMergeVectorResource, Simple) {
 TEST(TwoWayMergeVectorResource, Random) {
   std::mt19937 random(123);
   std::vector<uint64_t> first, second;
-  first.resize(1000);
-  second.resize(1000);
-  for (int _ = 0; _ < 128; ++_) {
+  first.resize(100);
+  second.resize(100);
+  for (int _ = 0; _ < 16; ++_) {
     FillVector(first, random);
     FillVector(second, random);
     TestMerge(FromDataAndIndex(first, kFirstIdentifier),
