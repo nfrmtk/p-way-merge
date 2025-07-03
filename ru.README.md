@@ -3,7 +3,7 @@
 ### Пререквизиты:
 
 ```bash
-sudo apt-get install cmake g++ make ninja-build libgtest-dev 
+sudo apt-get install cmake g++ make ninja-build libgtest-dev lld
 ```
 
 ### Просто запустить все работающие тесты:
@@ -12,7 +12,7 @@ sudo apt-get install cmake g++ make ninja-build libgtest-dev
 cd p-way-merge 
 mkdir build && cd build 
 cmake -DCMAKE_BUILD_TYPE=Debug ..
-cmake --build . -j`nproc` --target working_tests
+cmake --build . -j`nproc` --target tests
 ctest
 ```
 
@@ -28,4 +28,4 @@ cmake --build . --target merge_test_ut
 ./merge_test_ut
 ```
 
-На данный момент работают тесты merge_test, pack_test и simd_two_way_vector_resource_test.
+На данный момент работают тесты merge_test, pack_test, simd_two_way_vector_resource_test и spilling_block_test.cpp.

@@ -13,6 +13,8 @@ find_package(GTest REQUIRED)
 
 add_library(pmerge ${PMERGE_SOURCES})
 target_compile_options(pmerge PUBLIC "-mavx2")
+target_compile_options(pmerge PUBLIC "-fuse-ld=lld")
+target_link_options(pmerge PUBLIC "-fuse-ld=lld")
 target_compile_options(pmerge PUBLIC "-fsanitize=address,undefined")
 target_link_options(pmerge PUBLIC "-fsanitize=address,undefined")
 
@@ -22,7 +24,7 @@ target_include_directories(pmerge PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include")
 
 enable_testing()
 
-add_custom_target(working_tests)
+add_custom_target(tests)
 
 foreach (test ${PMERGE_TESTS})
     get_filename_component(filename ${test} NAME_WE)
@@ -31,7 +33,7 @@ foreach (test ${PMERGE_TESTS})
     target_link_libraries(${filename}_ut GTest::gtest_main)
     if ("${filename}" IN_LIST WORKING_TESTS)
         gtest_discover_tests(${filename}_ut)
-        add_dependencies(working_tests ${filename}_ut)
+        add_dependencies(tests ${filename}_ut)
     endif()
 endforeach()
 

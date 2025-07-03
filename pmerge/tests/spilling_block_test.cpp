@@ -27,36 +27,6 @@ static constexpr int kSpillBlockSize = 1 << 10;
 
 constexpr int kExternalMemorySize = 1 << 15;
 
-void TestResource(pmerge::Resource auto& tested_resouce,
-                  std::ranges::random_access_range auto&& answer) {
-  ASSERT_TRUE(std::ranges::is_sorted(answer)) << RangeToString(answer);
-  int answer_index = 0;
-  const int answer_size = std::ranges::size(answer);
-
-  while (tested_resouce.Peek() != pmerge::kInf) {
-    pmerge::IntermediateInteger peeked = tested_resouce.Peek();
-    int arr_index = 0;
-    pmerge::output << "TestResource::GetOneCall" << std::endl;
-    std::array<pmerge::IntermediateInteger, 4> arr =
-        pmerge::simd::AsArray(tested_resouce.GetOne());
-
-    auto debug_str = [&] {
-      return std::format("got from resource: {}, vs expected: {}. ",
-                         pmerge::MakeReadableString(arr[arr_index]),
-                         pmerge::MakeReadableString(answer[answer_index]));
-    };
-    ASSERT_EQ(peeked, arr[0]);
-    while (arr_index != 4 && arr[arr_index] != pmerge::kInf) {
-      ASSERT_LT(answer_index, answer_size);
-      ASSERT_TRUE(pmerge::IsValid(arr[arr_index]));
-      ASSERT_TRUE(pmerge::IsValid(answer[answer_index]));
-      ASSERT_EQ(arr[arr_index], answer[answer_index]) << debug_str();
-      ++answer_index;
-      ++arr_index;
-    }
-  }
-  ASSERT_EQ(answer_index, answer_size);
-}
 
 template <typename Number>
 class SpillingResourceSuite : public ::testing::Test{};
