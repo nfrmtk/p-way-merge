@@ -27,16 +27,13 @@ static constexpr int kSpillBlockSize = 1 << 10;
 
 constexpr int kExternalMemorySize = 1 << 15;
 
-
 template <typename Number>
-class SpillingResourceSuite : public ::testing::Test{};
+class SpillingResourceSuite : public ::testing::Test {};
 
-using test_key_sizes = ::testing::Types<
-    std::integral_constant<std::size_t,1>,
-    std::integral_constant<std::size_t,2>,
-    std::integral_constant<std::size_t,3>, 
-    std::integral_constant<std::size_t,4>
-    >;
+using test_key_sizes = ::testing::Types<std::integral_constant<std::size_t, 1>,
+                                        std::integral_constant<std::size_t, 2>,
+                                        std::integral_constant<std::size_t, 3>,
+                                        std::integral_constant<std::size_t, 4>>;
 
 static constexpr int kRandomSeed = 123;
 static constexpr int kBlockSize = 8 * 1024 * 1024;
@@ -81,21 +78,22 @@ TYPED_TEST_SUITE(SpillingResourceSuite, test_key_sizes);
 
 TYPED_TEST(SpillingResourceSuite, same_numbers) {
   static constexpr size_t kKeySize = TypeParam::value;
-  TestSpillingBlockResource<kKeySize>(std::views::repeat(1, kKeySize*100));
+  TestSpillingBlockResource<kKeySize>(std::views::repeat(1, kKeySize * 100));
 }
 
 TYPED_TEST(SpillingResourceSuite, increasing) {
   static constexpr size_t kKeySize = TypeParam::value;
-  TestSpillingBlockResource<kKeySize>(std::views::iota(0ull, 20*kKeySize));
+  TestSpillingBlockResource<kKeySize>(std::views::iota(0ull, 20 * kKeySize));
 }
 
 TYPED_TEST(SpillingResourceSuite, random) {
   static constexpr size_t kKeySize = TypeParam::value;
   std::mt19937_64 gen(123);
   std::uniform_int_distribution<int64_t> ints(0, 123);
-  auto nums = std::views::repeat(0ull, 16*kKeySize) | std::views::transform([&](size_t /*ignore*/){
-    return ints(gen);
-  }) | std::ranges::to<std::vector<int64_t>>();
+  auto nums =
+      std::views::repeat(0ull, 16 * kKeySize) |
+      std::views::transform([&](size_t /*ignore*/) { return ints(gen); }) |
+      std::ranges::to<std::vector<int64_t>>();
   TestSpillingBlockResource<kKeySize>(nums);
 }
 

@@ -5,9 +5,10 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <gtest/gtest.h>
 #include <immintrin.h>
 #include <pmerge/ydb/spilling_mem.h>
-#include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <memory>
@@ -237,19 +238,20 @@ inline std::vector<int64_t> SimpleMultiwayMerge(
   return tmp;
 }
 
-std::vector<pmerge::IntermediateInteger> AsVector(pmerge::Resource auto& resource){
+std::vector<pmerge::IntermediateInteger> AsVector(
+    pmerge::Resource auto& resource) {
   std::vector<pmerge::IntermediateInteger> ints;
   bool stopped = false;
-  while(true){
-    auto arr = pmerge::simd::AsArray( resource.GetOne());
-    for(int64_t num: arr){
-      if (num == pmerge::kInf){
+  while (true) {
+    auto arr = pmerge::simd::AsArray(resource.GetOne());
+    for (int64_t num : arr) {
+      if (num == pmerge::kInf) {
         stopped = true;
         break;
       }
       ints.push_back(num);
     }
-    if(stopped){
+    if (stopped) {
       break;
     }
   }
@@ -259,16 +261,17 @@ std::vector<pmerge::IntermediateInteger> AsVector(pmerge::Resource auto& resourc
 void TestResource(pmerge::Resource auto& tested_resouce,
                   std::ranges::random_access_range auto&& answer) {
   ASSERT_TRUE(std::ranges::is_sorted(answer)) << RangeToString(answer);
-  std::vector<pmerge::IntermediateInteger> test_vector{AsVector(tested_resouce)};
+  std::vector<pmerge::IntermediateInteger> test_vector{
+      AsVector(tested_resouce)};
   ASSERT_EQ(test_vector.size(), std::size(answer));
-  for(int idx = 0; idx < std::ssize(test_vector); ++idx){
+  for (int idx = 0; idx < std::ssize(test_vector); ++idx) {
     ASSERT_TRUE(pmerge::IsValid(test_vector[idx]));
 
-    ASSERT_EQ(test_vector[idx], answer[idx]) << std::format("got from resource: {}, vs expected: {}. ",
-                         pmerge::MakeReadableString(test_vector[idx]),
-                         pmerge::MakeReadableString(answer[idx]));
+    ASSERT_EQ(test_vector[idx], answer[idx])
+        << std::format("got from resource: {}, vs expected: {}. ",
+                       pmerge::MakeReadableString(test_vector[idx]),
+                       pmerge::MakeReadableString(answer[idx]));
   }
 }
-
 
 #endif  // UTILS_HPP

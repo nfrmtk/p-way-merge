@@ -19,15 +19,15 @@ class SpillingBlockReader {
       : external_memory_cache_(external_memory_cache) {}
   SlotView AdvanceByOne() {
     pmerge::output << std::format("slots left in storage: {}",
-                             slots_not_read_.size() >> 3)
-              << std::endl;
+                                  slots_not_read_.size() >> 3)
+                   << std::endl;
     if (slots_not_read_.empty()) {
       slots_not_read_ = external_memory_cache_.ResetBuffer();
       PMERGE_ASSERT_M(!slots_not_read_.empty(), "reading past-the-end block");
     }
     auto next = GetSlot(slots_not_read_);
     pmerge::output << std::format("Get another slot with hash: {:x}\n",
-                             GetHash(next));
+                                  GetHash(next));
     return next;
   }
 
