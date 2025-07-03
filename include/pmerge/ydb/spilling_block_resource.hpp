@@ -99,7 +99,7 @@ class SpillingBlockBufferedResource {
         "current_vec_ being valid");
     auto next = GetOneHelper();
     pmerge::output << "SpillingBlockBufferedResource::GetOne another array: "
-              << simd::ToString(next) << '\n';
+                   << simd::ToString(next) << '\n';
     std::swap(next, current_vec_);
     // auto next = _mm256_loadu_si256(
     //     reinterpret_cast<__m256i* const>(current_buffer_.data()));
@@ -108,9 +108,10 @@ class SpillingBlockBufferedResource {
 
  private:
   __m256i GetOneHelper() {
-    pmerge::output << std::format("currently_processed_slots_: {}, total_slots_: {}",
-                             currently_processed_slots_, total_slots_)
-              << std::endl;
+    pmerge::output << std::format(
+                          "currently_processed_slots_: {}, total_slots_: {}",
+                          currently_processed_slots_, total_slots_)
+                   << std::endl;
     if (currently_processed_slots_ >= total_slots_) {
       return simd::kInfVector;
     }

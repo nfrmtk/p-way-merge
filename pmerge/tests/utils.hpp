@@ -5,9 +5,10 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <gtest/gtest.h>
 #include <immintrin.h>
 #include <pmerge/ydb/spilling_mem.h>
-#include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <memory>
@@ -237,36 +238,40 @@ inline std::vector<int64_t> SimpleMultiwayMerge(
   return tmp;
 }
 
+std::vector<pmerge::IntermediateInteger> AsVector(
+    pmerge::Resource auto& resource) {
+  std::vector<pmerge::IntermediateInteger> ints;
+  bool stopped = false;
+  while (true) {
+    auto arr = pmerge::simd::AsArray(resource.GetOne());
+    for (int64_t num : arr) {
+      if (num == pmerge::kInf) {
+        stopped = true;
+        break;
+      }
+      ints.push_back(num);
+    }
+    if (stopped) {
+      break;
+    }
+  }
+  return ints;
+}
+
 void TestResource(pmerge::Resource auto& tested_resouce,
                   std::ranges::random_access_range auto&& answer) {
   ASSERT_TRUE(std::ranges::is_sorted(answer)) << RangeToString(answer);
-  int answer_index = 0;
-  const int answer_size = std::ranges::size(answer);
+  std::vector<pmerge::IntermediateInteger> test_vector{
+      AsVector(tested_resouce)};
+  ASSERT_EQ(test_vector.size(), std::size(answer));
+  for (int idx = 0; idx < std::ssize(test_vector); ++idx) {
+    ASSERT_TRUE(pmerge::IsValid(test_vector[idx]));
 
-  while (tested_resouce.Peek() != pmerge::kInf) {
-    pmerge::IntermediateInteger peeked = tested_resouce.Peek();
-    int arr_index = 0;
-    pmerge::output << "TestResource::GetOneCall" << std::endl;
-    std::array<pmerge::IntermediateInteger, 4> arr =
-        pmerge::simd::AsArray(tested_resouce.GetOne());
-
-    auto debug_str = [&] {
-      return std::format("got from resource: {}, vs expected: {}. ",
-                         pmerge::MakeReadableString(arr[arr_index]),
-                         pmerge::MakeReadableString(answer[answer_index]));
-    };
-    ASSERT_EQ(peeked, arr[0]);
-    while (arr_index != 4 && arr[arr_index] != pmerge::kInf) {
-      ASSERT_LT(answer_index, answer_size);
-      ASSERT_TRUE(pmerge::IsValid(arr[arr_index]));
-      ASSERT_TRUE(pmerge::IsValid(answer[answer_index]));
-      ASSERT_EQ(arr[arr_index], answer[answer_index]) << debug_str();
-      ++answer_index;
-      ++arr_index;
-    }
+    ASSERT_EQ(test_vector[idx], answer[idx])
+        << std::format("got from resource: {}, vs expected: {}. ",
+                       pmerge::MakeReadableString(test_vector[idx]),
+                       pmerge::MakeReadableString(answer[idx]));
   }
-  ASSERT_EQ(answer_index, answer_size);
 }
-
 
 #endif  // UTILS_HPP
