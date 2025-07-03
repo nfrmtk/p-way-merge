@@ -8,6 +8,7 @@
 
 #include <array>
 #include <pmerge/common/resource.hpp>
+#include <pmerge/common/print.hpp>
 #include <pmerge/simd/inregister_merge.hpp>
 #include <string>
 namespace pmerge::simd {
@@ -33,15 +34,17 @@ template <typename T, int Shift>
 T GetAtPos(__m256i reg) {
   return static_cast<T>(_mm256_extract_epi64(reg, Shift));
 }
-
-inline std::array<int64_t, 4> AsArray(__m256i reg) {
-  return {GetAtPos<int64_t, 0>(reg), GetAtPos<int64_t, 1>(reg),
-          GetAtPos<int64_t, 2>(reg), GetAtPos<int64_t, 3>(reg)};
-}
-
 std::string ToString(__m256i reg);
 
 std::string ToHexString(__m256i reg);
+
+inline std::array<int64_t, 4> AsArray(__m256i reg) {
+  pmerge::output << std::format("pmerge::simd::AsArray reg: {}",
+                           pmerge::simd::ToHexString(reg))
+            << std::endl;
+  return {GetAtPos<int64_t, 0>(reg), GetAtPos<int64_t, 1>(reg),
+          GetAtPos<int64_t, 2>(reg), GetAtPos<int64_t, 3>(reg)};
+}
 
 static const __m256i kInfVector =
     pmerge::simd::MakeFrom(kInf, kInf, kInf, kInf);

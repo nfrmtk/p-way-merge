@@ -6,7 +6,7 @@
 #include <format>
 #include <iostream>
 #ifndef NDEBUG
-#define PMERGE_ASSERT_M(condition, message)                                \
+#define PMERGE_ASSERT_M(condition, message)                              \
   do {                                                                   \
     if (!(condition)) {                                                  \
       std::cerr << std::format(                                          \

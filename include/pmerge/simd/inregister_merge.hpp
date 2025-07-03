@@ -11,12 +11,12 @@
   __attribute__((always_inline))  // todo: research forceinline functions
                                   // instead of macros
 
-#define PMERGE_MINMAX(vMin, vMax)                     \
-  {                                                   \
-    auto __mask = _mm256_cmpgt_epi64(vMin, vMax);       \
+#define PMERGE_MINMAX(vMin, vMax)                         \
+  {                                                       \
+    auto __mask = _mm256_cmpgt_epi64(vMin, vMax);         \
     auto __vTmp = _mm256_blendv_epi8(vMin, vMax, __mask); \
-    vMax = _mm256_blendv_epi8(vMax, vMin, __mask);      \
-    vMin = __vTmp;                                      \
+    vMax = _mm256_blendv_epi8(vMax, vMin, __mask);        \
+    vMin = __vTmp;                                        \
   }
 
 #define PMERGE_MERGE(vMin, vMax)                                    \

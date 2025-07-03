@@ -6,17 +6,156 @@
 #define UTILS_HPP
 
 #include <immintrin.h>
-
+#include <pmerge/ydb/spilling_mem.h>
+#include <gtest/gtest.h>
+#include <algorithm>
 #include <cstdint>
+#include <memory>
+#include <numeric>
 #include <ostream>
+#include <pmerge/common/print.hpp>
+#include <pmerge/simd/utils.hpp>
 #include <random>
+#include <type_traits>
+#include <utility>
 #include <vector>
+
+#include "pmerge/common/assert.hpp"
+#include "pmerge/common/resource.hpp"
+#include "pmerge/ydb/types.hpp"
 namespace std {
 inline std::ostream& operator<<(std::ostream& os, __m256i reg) {
   os << pmerge::simd::ToString(reg);
   return os;
 }
 }  // namespace std
+namespace pmerge::ydb {
+
+template <ui64 keyCount>
+bool Equal(pmerge::ydb::Key<keyCount> first,
+           pmerge::ydb::Key<keyCount> second) {
+  for (int idx = 0; idx < keyCount; ++idx) {
+    if (first[idx] != second[idx]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+template <ui64 keyCount>
+bool LexicographicallyLess(pmerge::ydb::Key<keyCount> first,
+                           pmerge::ydb::Key<keyCount> second) {
+  for (int idx = 0; idx < keyCount; ++idx) {
+    if (first[idx] > second[idx]) {
+      return false;
+    }
+    if (first[idx] < second[idx]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// SlotLess satisfies strict weak ordering.
+template <ui64 keyCount>
+bool SlotLess(const pmerge::ydb::Slot& first, const pmerge::ydb::Slot& second) {
+  using pmerge::ydb::AsView;
+  using pmerge::ydb::GetKey;
+  auto first_view = AsView(first);
+  auto second_view = AsView(first);
+  if (pmerge::ydb::GetHash(first) < pmerge::ydb::GetHash(second)) {
+    return true;
+  }
+  if (pmerge::ydb::GetHash(first) > pmerge::ydb::GetHash(second)) {
+    return false;
+  }
+  auto first_key = GetKey<keyCount>(first_view);
+  auto second_key = GetKey<keyCount>(second_view);
+  if (Equal(first_key, second_key)) {
+    return false;
+  }
+  if (LexicographicallyLess(first_key, second_key)) {
+    return true;
+  } else {
+    PMERGE_ASSERT(std::ranges::lexicographical_compare(second_key, first_key));
+    return false;
+  }
+}
+
+template <auto keySize>
+uint64_t Hash(pmerge::ydb::Key<keySize> key) {
+  return std::accumulate(key.begin(), key.end(), 0ull);
+}
+
+template <uint32_t keySize>
+TSpillingBlock MakeRandomSlotsBlock(TSpilling& stats, std::mt19937_64& gen,
+                                    uint64_t size_slots) {
+  const int64_t size_nums = size_slots * 8;
+  std::uniform_int_distribution<uint64_t> nums(0);
+  std::uniform_int_distribution<uint64_t> counts(0, 10);
+  auto storage = std::make_unique<Slot[]>(size_slots);
+  for (int idx = 0; idx < size_slots; idx++) {
+    Slot* this_slot = storage.get() + idx;
+    std::generate_n(&this_slot->nums[1], keySize, [&] { return nums(gen); });
+    this_slot->nums[0] =
+        Hash(pmerge::ydb::GetKey<keySize>(ConstSlotView{this_slot->nums}));
+    this_slot->nums[7] = counts(gen);
+  }
+  std::sort(storage.get(), storage.get() + size_slots, SlotLess<keySize>);
+  return stats.Save(storage.get(), size_slots * 64, 0);
+}
+template <uint32_t keySize>
+TSpillingBlock MakeSlotsBlock(TSpilling& stats, auto keys_gen, auto counts_gen,
+                              int64_t size_slots) {
+  auto storage = std::make_unique<Slot[]>(size_slots);
+  for (int idx = 0; idx < size_slots; idx++) {
+    Slot* this_slot = storage.get() + idx;
+    std::generate_n(&this_slot->nums[1], keySize, [&] { return keys_gen(); });
+    this_slot->nums[0] =
+        Hash(pmerge::ydb::GetKey<keySize>(ConstSlotView{this_slot->nums}));
+    this_slot->nums[7] = counts_gen();
+  }
+  std::sort(storage.get(), storage.get() + size_slots, SlotLess<keySize>);
+  return stats.Save(storage.get(), size_slots * 64, 0);
+}
+template <typename Value>
+std::span<Value> AsSpan(TSpillingBlock& block) {
+  PMERGE_ASSERT(block.BlockSize % sizeof(Value) == 0);
+  return std::span{static_cast<Value*>(block.ExternalMemory),
+                   static_cast<Value*>(block.ExternalMemory) +
+                       block.BlockSize / sizeof(Value)};
+}
+
+template <typename T>
+TSpillingBlock MakeSpillingBlock(const std::unique_ptr<T>& pointer,
+                                 int64_t size) {
+  return TSpillingBlock{pointer.get(),
+                        size * sizeof(std::remove_all_extents_t<T>), 0};
+}
+
+}  // namespace pmerge::ydb
+
+inline std::vector<uint64_t> MakeBuffer(int size_slots) {
+  return std::vector<uint64_t>(size_slots * 8, 0);
+}
+
+std::string RangeToString(std::ranges::range auto&& range) {
+  std::string str;
+  for (const auto& val : range) {
+    str += std::format("{}", val);
+  }
+  return str;
+}
+
+void PrintIntermediateIntegersRange(std::ranges::range auto&& range) {
+  for (const auto& num : range) {
+    pmerge::utils::PrintIfDebug(pmerge::MakeReadableString(num) + ' ');
+  }
+  pmerge::output << std::endl;
+}
+
+template <typename T>
+void F() = delete;
 
 inline void GetComplimentary(const uint64_t* arr, uint64_t* dst) {
   int out_idx = 0;
@@ -28,6 +167,18 @@ inline void GetComplimentary(const uint64_t* arr, uint64_t* dst) {
     }
   }
 }
+
+template <typename F>
+class Defer {
+ public:
+  Defer(F&& f) : fun_(std::forward<F>(f)) {
+    static_assert(std::is_nothrow_invocable_v<F>);
+  }
+  ~Defer() { fun_(); }
+
+ private:
+  F fun_;
+};
 
 template <typename Callback>
 void ForEachPermutationsOfRegisters(Callback cb) {
@@ -85,4 +236,37 @@ inline std::vector<int64_t> SimpleMultiwayMerge(
   }
   return tmp;
 }
+
+void TestResource(pmerge::Resource auto& tested_resouce,
+                  std::ranges::random_access_range auto&& answer) {
+  ASSERT_TRUE(std::ranges::is_sorted(answer)) << RangeToString(answer);
+  int answer_index = 0;
+  const int answer_size = std::ranges::size(answer);
+
+  while (tested_resouce.Peek() != pmerge::kInf) {
+    pmerge::IntermediateInteger peeked = tested_resouce.Peek();
+    int arr_index = 0;
+    pmerge::output << "TestResource::GetOneCall" << std::endl;
+    std::array<pmerge::IntermediateInteger, 4> arr =
+        pmerge::simd::AsArray(tested_resouce.GetOne());
+
+    auto debug_str = [&] {
+      return std::format("got from resource: {}, vs expected: {}. ",
+                         pmerge::MakeReadableString(arr[arr_index]),
+                         pmerge::MakeReadableString(answer[answer_index]));
+    };
+    ASSERT_EQ(peeked, arr[0]);
+    while (arr_index != 4 && arr[arr_index] != pmerge::kInf) {
+      ASSERT_LT(answer_index, answer_size);
+      ASSERT_TRUE(pmerge::IsValid(arr[arr_index]));
+      ASSERT_TRUE(pmerge::IsValid(answer[answer_index]));
+      ASSERT_EQ(arr[arr_index], answer[answer_index]) << debug_str();
+      ++answer_index;
+      ++arr_index;
+    }
+  }
+  ASSERT_EQ(answer_index, answer_size);
+}
+
+
 #endif  // UTILS_HPP
