@@ -7,6 +7,7 @@
 #include <array>
 #include <bitset>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <pmerge/simd/utils.hpp>
@@ -16,6 +17,8 @@
 #include <ranges>
 #include <vector>
 
+#include "gtest/gtest.h"
+#include "pmerge/common/print.hpp"
 #include "pmerge/common/resource.hpp"
 #include "pmerge/ydb/spilling_mem.h"
 #include "pmerge/ydb/types.hpp"
@@ -33,7 +36,7 @@ void TestResource(pmerge::Resource auto& tested_resouce,
   while (tested_resouce.Peek() != pmerge::kInf) {
     pmerge::IntermediateInteger peeked = tested_resouce.Peek();
     int arr_index = 0;
-    std::cout << "TestResource::GetOneCall" << std::endl;
+    pmerge::output << "TestResource::GetOneCall" << std::endl;
     std::array<pmerge::IntermediateInteger, 4> arr =
         pmerge::simd::AsArray(tested_resouce.GetOne());
 
@@ -54,6 +57,16 @@ void TestResource(pmerge::Resource auto& tested_resouce,
   }
   ASSERT_EQ(answer_index, answer_size);
 }
+
+template <typename Number>
+class SpillingResourceSuite : public ::testing::Test{};
+
+using test_types = ::testing::Types<
+    std::integral_constant<std::size_t,1>,
+    std::integral_constant<std::size_t,2>,
+    std::integral_constant<std::size_t,3>, 
+    std::integral_constant<std::size_t,4>
+    >;
 
 static constexpr int kRandomSeed = 123;
 static constexpr int kBlockSize = 8 * 1024 * 1024;
@@ -103,6 +116,7 @@ void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
       }) |
       std::ranges::to<std::vector<pmerge::IntermediateInteger>>()};
   std::ranges::sort(packed);
+  pmerge::output << "packed: ";
   PrintIntermediateIntegersRange(packed);
   pmerge::ydb::SpillingBlockBufferedResource<1> resource{
       stats, external_memory, std::span{buffer}, resource_index};
@@ -113,13 +127,26 @@ TEST(SpillingBlockResource, simple) {
   TestSpillingBlockWithKeySizeOne(std::vector{1, 3, 4, 8});
 }
 
-TEST(SpillingBlockResource, same_numbers) {
-  TestSpillingBlockWithKeySizeOne(std::views::repeat(1, 100));
+TYPED_TEST_SUITE(SpillingResourceSuite, test_types);
+
+TYPED_TEST(SpillingResourceSuite, same_numbers) {
+  static constexpr size_t kKeySize = TypeParam::value;
+  TestSpillingBlockResource<kKeySize>(std::views::repeat(1, kKeySize*100));
 }
 
-TEST(SpillingBlockResource, increasing) {
-  TestSpillingBlockResource<2>(std::views::iota(0, 40));
-  TestSpillingBlockWithKeySizeOne(std::views::iota(0, 40));
+TYPED_TEST(SpillingResourceSuite, increasing) {
+  static constexpr size_t kKeySize = TypeParam::value;
+  TestSpillingBlockResource<kKeySize>(std::views::iota(0ull, 20*kKeySize));
+}
+
+TYPED_TEST(SpillingResourceSuite, random) {
+  static constexpr size_t kKeySize = TypeParam::value;
+  std::mt19937_64 gen(123);
+  std::uniform_int_distribution<int64_t> ints(0, 123);
+  auto nums = std::views::repeat(0ull, 16*kKeySize) | std::views::transform([&](size_t /*ignore*/){
+    return ints(gen);
+  }) | std::ranges::to<std::vector<int64_t>>();
+  TestSpillingBlockResource<kKeySize>(nums);
 }
 
 // TEST(Merge, Random) { TestMerge<uint32_t{2}>(); }

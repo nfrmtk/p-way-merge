@@ -44,9 +44,9 @@ void TestMerge(const std::vector<int64_t>& first_vec,
                                            print_registers};
   if (merged.size() < 100) {
     for (auto num : merged) {
-      std::cout << pmerge::MakeReadableString(num) << ' ';
+      pmerge::output << pmerge::MakeReadableString(num) << ' ';
     }
-    std::cout << std::endl;
+    pmerge::output << std::endl;
   }
   static_assert(pmerge::Resource<decltype(merger)>, "asd");
   for (int idx = 0; idx + 4 <= std::ssize(merged); idx += 4) {

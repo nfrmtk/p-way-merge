@@ -151,7 +151,7 @@ void PrintIntermediateIntegersRange(std::ranges::range auto&& range) {
   for (const auto& num : range) {
     pmerge::utils::PrintIfDebug(pmerge::MakeReadableString(num) + ' ');
   }
-  std::cout << std::endl;
+  pmerge::output << std::endl;
 }
 
 template <typename T>

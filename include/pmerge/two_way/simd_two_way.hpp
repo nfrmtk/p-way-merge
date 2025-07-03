@@ -61,7 +61,7 @@ class SimdTwoWayMerger {
       std::source_location loc = std::source_location::current()) const {
 #ifndef NDEBUG
     if (print_registers_) {
-      std::cout << std::format(
+      pmerge::output << std::format(
           "state: {},  min: {}, max: {}, header line number: {}\n", prefix,
           simd::ToString(vMin_), simd::ToString(vMax_), loc.line());
     }
