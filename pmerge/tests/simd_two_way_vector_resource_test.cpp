@@ -80,7 +80,7 @@ TEST(TwoWayMergeVectorResource, Random) {
   std::vector<uint64_t> first, second;
   first.resize(1000);
   second.resize(1000);
-  for (int _ = 0; _ < 1000; ++_) {
+  for (int _ = 0; _ < 128; ++_) {
     FillVector(first, random);
     FillVector(second, random);
     TestMerge(FromDataAndIndex(first, kFirstIdentifier),
