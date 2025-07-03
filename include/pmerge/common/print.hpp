@@ -25,9 +25,7 @@ inline auto output = noop_ostr{};
 
 namespace pmerge::utils {
 inline void PrintIfDebug(std::string_view string) {
-#ifndef NDEBUG
   pmerge::output << string;
   pmerge::output.flush();
-#endif
 }
 }  // namespace pmerge::utils
