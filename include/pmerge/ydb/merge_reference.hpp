@@ -9,13 +9,14 @@
 
 #include <deque>
 #include <iosfwd>
+#include <pmerge/common/print.hpp>
 #include <string_view>
 
 constexpr ui32 slotSize = 8;
 
 template <ui32 keyCount>
 struct TInputData {
-  TInputData() {}
+  TInputData() : Block(nullptr, 0, 0) {}
 
   TInputData(TSpillingBlock block, ui64 *buffer, ui64 bufferSize) {
     Init(block, buffer, bufferSize);

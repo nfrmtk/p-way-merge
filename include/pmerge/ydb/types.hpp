@@ -15,14 +15,19 @@ typedef uint64_t ui64;
 typedef int64_t i64;
 
 namespace pmerge::ydb {
-struct Slot {
-  uint64_t nums[8];
-};
 
 static constexpr int kSlotBytes = 64;
 using SlotView = std::span<uint64_t, 8>;
 using ConstSlotView = std::span<const uint64_t, 8>;
-
+struct Slot {
+  static Slot FromView(ConstSlotView view) {
+    Slot s{};
+    std::ranges::copy(view, s.nums);
+    return s;
+  }
+  ConstSlotView AsView() const { return nums; }
+  uint64_t nums[8];
+};
 inline SlotView GetSlot(std::span<uint64_t>& buffer) {
   SlotView ret = buffer.subspan<0, 8>();
   buffer = buffer.subspan<8>();
@@ -44,6 +49,7 @@ inline void AssertSplittableBySlots(
 inline uint64_t GetHash(ConstSlotView slot) { return slot[0]; }
 inline uint64_t GetHash(const Slot& slot) { return slot.nums[0]; }
 inline ConstSlotView AsView(const Slot& slot) { return slot.nums; }
+inline SlotView AsView(Slot& slot) { return slot.nums; }
 
 inline uint64_t& GetAggregateValue(SlotView slot) { return slot[7]; }
 template <ui64 KeyCount>

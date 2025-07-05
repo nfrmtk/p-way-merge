@@ -10,6 +10,7 @@
 #include <pmerge/ydb/spilling_mem.h>
 
 #include <algorithm>
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <numeric>
@@ -58,32 +59,6 @@ bool LexicographicallyLess(pmerge::ydb::Key<keyCount> first,
   return false;
 }
 
-// SlotLess satisfies strict weak ordering.
-template <ui64 keyCount>
-bool SlotLess(const pmerge::ydb::Slot& first, const pmerge::ydb::Slot& second) {
-  using pmerge::ydb::AsView;
-  using pmerge::ydb::GetKey;
-  auto first_view = AsView(first);
-  auto second_view = AsView(first);
-  if (pmerge::ydb::GetHash(first) < pmerge::ydb::GetHash(second)) {
-    return true;
-  }
-  if (pmerge::ydb::GetHash(first) > pmerge::ydb::GetHash(second)) {
-    return false;
-  }
-  auto first_key = GetKey<keyCount>(first_view);
-  auto second_key = GetKey<keyCount>(second_view);
-  if (Equal(first_key, second_key)) {
-    return false;
-  }
-  if (LexicographicallyLess(first_key, second_key)) {
-    return true;
-  } else {
-    PMERGE_ASSERT(std::ranges::lexicographical_compare(second_key, first_key));
-    return false;
-  }
-}
-
 template <auto keySize>
 uint64_t Hash(pmerge::ydb::Key<keySize> key) {
   return std::accumulate(key.begin(), key.end(), 0ull);
@@ -120,22 +95,32 @@ TSpillingBlock MakeSlotsBlock(TSpilling& stats, auto keys_gen, auto counts_gen,
   std::sort(storage.get(), storage.get() + size_slots, SlotLess<keySize>);
   return stats.Save(storage.get(), size_slots * 64, 0);
 }
-template <typename Value>
-std::span<Value> AsSpan(TSpillingBlock& block) {
-  PMERGE_ASSERT(block.BlockSize % sizeof(Value) == 0);
-  return std::span{static_cast<Value*>(block.ExternalMemory),
-                   static_cast<Value*>(block.ExternalMemory) +
-                       block.BlockSize / sizeof(Value)};
-}
 
-template <typename T>
-TSpillingBlock MakeSpillingBlock(const std::unique_ptr<T>& pointer,
-                                 int64_t size) {
-  return TSpillingBlock{pointer.get(),
-                        size * sizeof(std::remove_all_extents_t<T>), 0};
+inline std::vector<Slot> AsSlotsVector(TSpilling& stats,
+                                       const TSpillingBlock& block) {
+  std::vector<Slot> slots;
+  PMERGE_ASSERT(block.BlockSize % 64 == 0);
+  slots.resize(block.BlockSize / 64);
+  stats.Load(block, 0, slots.data(), block.BlockSize);
+  return slots;
 }
 
 }  // namespace pmerge::ydb
+
+template <size_t KeySize, size_t IndexBits>
+auto ToIntermediateIntegers(std::bitset<IndexBits> index) {
+  return std::views::transform([=](const pmerge::ydb::Slot& slot) {
+           return pmerge::PackFrom(pmerge::ydb::GetHash(slot), index);
+         }) |
+         std::ranges::to<std::vector<pmerge::IntermediateInteger>>();
+}
+
+template <size_t KeySize, size_t IndexBits>
+auto SpillBlockToInts(TSpilling& stats, const TSpillingBlock& block,
+                      std::bitset<IndexBits> index) {
+  return pmerge::ydb::AsSlotsVector(stats, block) |
+         ToIntermediateIntegers<KeySize, IndexBits>(index);
+}
 
 inline std::vector<uint64_t> MakeBuffer(int size_slots) {
   return std::vector<uint64_t>(size_slots * 8, 0);
@@ -235,6 +220,21 @@ inline std::vector<int64_t> SimpleMultiwayMerge(
   std::vector<int64_t> output;
   std::vector<int64_t> tmp;
   for (auto& vec : nums) {
+    std::merge(vec.begin(), vec.end(), tmp.begin(), tmp.end(),
+               std::back_inserter(output));
+    tmp = std::move(output);
+  }
+  return tmp;
+}
+
+inline std::vector<pmerge::ydb::Slot> SimpleMultiwayMerge(
+    const std::ranges::range auto& nums)
+  requires std::same_as<std::vector<pmerge::ydb::Slot>,
+                        std::ranges::range_value_t<decltype(nums)>>
+{
+  std::vector<pmerge::ydb::Slot> output;
+  std::vector<pmerge::ydb::Slot> tmp;
+  for (int k = 0; auto& vec : nums) {
     std::merge(vec.begin(), vec.end(), tmp.begin(), tmp.end(),
                std::back_inserter(output));
     tmp = std::move(output);

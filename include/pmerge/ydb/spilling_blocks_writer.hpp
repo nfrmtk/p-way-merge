@@ -17,25 +17,25 @@ class SpillingBlocksWriter {
   SpillingBlocksWriter(TSpilling& stats, TSpillingBlock external_memory,
                        std::span<uint64_t> buffer)
       : stats_(stats), external_memory_(external_memory), buffer_(buffer) {}
-  void Write(SlotView slot) {
+  void Write(ConstSlotView slot) {
     total_writes_++;
     if (buffer_left_.empty()) {
       Flush();
     }
-
-    buffer_left_ = slot;
+    std::ranges::copy(slot, buffer_left_.data());
 
     buffer_left_ = buffer_left_.subspan(8);
   }
   void Flush() {
-    external_memory_ = stats_.Append(external_memory_, buffer_left_.data(),
-                                     buffer_left_.size_bytes());
+    external_memory_ =
+        stats_.Append(external_memory_, buffer_.data(), buffer_.size_bytes());
     buffer_left_ = buffer_;
   }
   ~SpillingBlocksWriter() {
     PMERGE_ASSERT_M(buffer_left_.size() == 0,
                     "writer buffer dropping some slots not written to memory");
   }
+  auto GetExternalMemory() { return external_memory_; }
   int64_t TotalWrites() const { return total_writes_; }
 
  private:

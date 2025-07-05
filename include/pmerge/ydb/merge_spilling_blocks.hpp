@@ -4,7 +4,10 @@
 
 #ifndef MERGE_SPILLING_BLOCKS_HPP
 #define MERGE_SPILLING_BLOCKS_HPP
+#include <sys/stat.h>
+
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <numeric>
@@ -14,11 +17,13 @@
 #include <pmerge/ydb/spilling_blocks_writer.hpp>
 #include <ranges>
 
+#include "pmerge/simd/utils.hpp"
+#include "pmerge/ydb/types.hpp"
 #include "spilling_mem.h"
 
-template <ui32 keyCount>
-bool Equal(std::span<const pmerge::ydb::SlotView, keyCount> first,
-           std::span<const pmerge::ydb::SlotView, keyCount> second) {
+template <size_t keyCount>
+bool Equal(pmerge::ydb::Key<keyCount> first,
+           pmerge::ydb::Key<keyCount> second) {
   for (int idx = 0; idx < keyCount; ++idx) {
     if (first[idx] != second[idx]) {
       return false;
@@ -27,9 +32,8 @@ bool Equal(std::span<const pmerge::ydb::SlotView, keyCount> first,
   return true;
 }
 
-template <ui32 keyCount>
-bool Less(std::span<const pmerge::ydb::SlotView, keyCount> first,
-          std::span<const pmerge::ydb::SlotView, keyCount> second) {
+template <size_t keyCount>
+bool Less(pmerge::ydb::Key<keyCount> first, pmerge::ydb::Key<keyCount> second) {
   for (int idx = 0; idx < keyCount; ++idx) {
     if (first[idx] > second[idx]) {
       return false;
@@ -41,17 +45,17 @@ bool Less(std::span<const pmerge::ydb::SlotView, keyCount> first,
   return false;
 }
 
+// SlotLess satisfies strict weak ordering.
 template <ui32 keyCount>
-bool SlotLess(const pmerge::ydb::SlotView& first,
-              const pmerge::ydb::SlotView& second) {
+bool SlotLess(const pmerge::ydb::Slot& first, const pmerge::ydb::Slot& second) {
   if (pmerge::ydb::GetHash(first) < pmerge::ydb::GetHash(second)) {
     return true;
   }
   if (pmerge::ydb::GetHash(first) > pmerge::ydb::GetHash(second)) {
     return false;
   }
-  auto first_span = pmerge::ydb::GetKey<keyCount>(first);
-  auto second_span = pmerge::ydb::GetKey<keyCount>(second);
+  auto first_span = pmerge::ydb::GetKey<keyCount>(first.AsView());
+  auto second_span = pmerge::ydb::GetKey<keyCount>(second.AsView());
   if (Equal(first_span, second_span)) {
     return false;
   }
@@ -64,8 +68,8 @@ bool SlotLess(const pmerge::ydb::SlotView& first,
   }
 }
 template <ui32 keyCount>
-bool SlotEqual(const pmerge::ydb::SlotView& first,
-               const pmerge::ydb::SlotView& second) {
+bool SlotEqual(pmerge::ydb::ConstSlotView first,
+               pmerge::ydb::ConstSlotView second) {
   return pmerge::ydb::GetHash(first) == pmerge::ydb::GetHash(second) &&
          Equal(pmerge::ydb::GetKey<keyCount>(first),
                pmerge::ydb::GetKey<keyCount>(second));
@@ -74,8 +78,8 @@ bool SlotEqual(const pmerge::ydb::SlotView& first,
 namespace pmerge::ydb {
 template <bool finalize /*use fo?*/, ui32 keyCount /*hashed string length*/,
           ui32 p /*loser tree depth*/>
-ui32 merge2pway(ui64* wordsBuffer, ui32 wordsBufferSize, std::ostream& fo,
-                TSpilling& sp, std::deque<TSpillingBlock>& spills) {
+ui32 merge2pway(ui64* wordsBuffer, ui32 wordsBufferSize, TSpilling& sp,
+                std::deque<TSpillingBlock>& spills) {
   int64_t slotBufferSize = wordsBufferSize / 8;
   int buffer_offset_slots = 0;
   auto make_buffer_with_size = [&](int size) -> std::span<ui64> {
@@ -100,8 +104,9 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 wordsBufferSize, std::ostream& fo,
     output_readers.emplace_back(SpillingBlocksBuffer{
         sp, spills[idx], make_buffer_with_size(output_buffer_size)});
   }
-  TreeType loser_tree = pmerge::multi_way::MakeLoserTree<1 << p>(
-      std::views::iota(0, n) | std::views::transform([&](int block_index) {
+  TreeType loser_tree = pmerge::multi_way::MakeLoserTree<
+      SpillingBlockBufferedResource<p>, 1 << p>(
+      std::views::iota(0, n) | std::views::transform([&](size_t block_index) {
         return SpillingBlockBufferedResource<p>(
             sp, spills[block_index], make_buffer_with_size(input_buffer_size),
             Identifer{block_index});
@@ -114,25 +119,22 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 wordsBufferSize, std::ostream& fo,
     nums_left.push_back(arr[3]);
   };
   std::array<int64_t, 1 << p> amounts_of_slots_from{{}};
-  std::vector<pmerge::ydb::SlotView> slots;
+  std::vector<pmerge::ydb::Slot> slots;
   auto reset_amounts_of_slots_from = [&] {
     amounts_of_slots_from.fill(0);
     int total_amount = 0;
     const uint64_t current_hash_bits =
         *pmerge::ExtractCutHash<p>(nums_left.front());
-    size_t index = pmerge::ExtractIdentifer<p>(nums_left.front());
-    slots.emplace_back(output_readers[index].AdvanceByOne());
+    size_t index = pmerge::ExtractIdentifer<p>(nums_left.front())->to_ullong();
+    slots.emplace_back(Slot::FromView(output_readers[index].AdvanceByOne()));
     while (!nums_left.empty() &&
            *pmerge::ExtractCutHash<p>(nums_left.front()) == current_hash_bits) {
       index = pmerge::ExtractIdentifer<p>(nums_left.front())->to_ullong();
-      ++amounts_of_slots_from[index];
-      nums_left.pop_front();
-      ++total_amount;
-      slots.emplace_back(output_readers[index].AdvanceByOne());
+      slots.emplace_back(Slot::FromView(output_readers[index].AdvanceByOne()));
     }
   };
   while (true) {
-    if (loser_tree.template Peek() == kInf && nums_left.empty()) {
+    if (loser_tree.Peek() == kInf && nums_left.empty()) {
       break;
     }
     // if (!nums_left.empty()) {
@@ -146,34 +148,40 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 wordsBufferSize, std::ostream& fo,
     //   }
     // }
 
-    while (nums_left.empty() ||
-           ExtractCutHash<p>(nums_left.front()) ==
-               ExtractCutHash<p>(loser_tree.template Peek())) {
+    while (nums_left.empty() || ExtractCutHash<p>(nums_left.front()) ==
+                                    ExtractCutHash<p>(loser_tree.Peek())) {
       PMERGE_ASSERT_M(nums_left.front() != kInf,
                       "nums_left are actual nums not inf");
-      append_array(loser_tree.template GetOne());
+      append_array(simd::AsArray(loser_tree.GetOne()));
     }
     while (nums_left.back() == kInf) {  // merge almost ended
       nums_left.pop_back();
     }
     reset_amounts_of_slots_from();
     if (slots.size() == 1) {
-      external_memory_buffer.Write(slots.front());
+      external_memory_buffer.Write(AsView(slots.front()));
     } else {
-      std::ranges::sort(slots, &SlotLess<keyCount>);
-      SlotView current = slots.front();
+      std::ranges::sort(slots, [](const Slot& first, const Slot& second) {
+        return SlotLess<keyCount>(first, second);
+      });
+      SlotView current = AsView(slots.front());
       for (int idx = 1; idx < std::ssize(slots); idx++) {
-        if (SlotEqual<keyCount>(slots[idx - 1], slots[idx])) {
-          GetAggregateValue(current) += GetAggregateValue(slots[idx]);
+        if (SlotEqual<keyCount>(slots[idx - 1].AsView(), slots[idx].AsView())) {
+          GetAggregateValue(current) += GetAggregateValue(AsView(slots[idx]));
         } else {
           external_memory_buffer.Write(current);
-          current = slots[idx];
+          current = AsView(slots[idx]);
         }
       }
       external_memory_buffer.Write(current);
     }
   }
   external_memory_buffer.Flush();
+  spills.push_back(external_memory_buffer.GetExternalMemory());
+  for (int idx = 0; idx < n; ++idx) {
+    sp.Delete(spills.front());
+    spills.pop_front();
+  }
   return external_memory_buffer.TotalWrites();
 }
 }  // namespace pmerge::ydb
