@@ -4,6 +4,7 @@
 
 #ifndef TYPES_HPP
 #define TYPES_HPP
+#include <algorithm>
 #include <cstdint>
 #include <pmerge/common/assert.hpp>
 #include <source_location>
@@ -58,6 +59,60 @@ using Key = std::span<const uint64_t, KeyCount>;
 template <ui64 KeyCount>
 Key<KeyCount> GetKey(ConstSlotView slot) {
   return Key<KeyCount>{&slot[1], &slot[1 + KeyCount]};
+}
+
+template <size_t keyCount>
+bool Equal(pmerge::ydb::Key<keyCount> first,
+           pmerge::ydb::Key<keyCount> second) {
+  for (int idx = 0; idx < keyCount; ++idx) {
+    if (first[idx] != second[idx]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+template <size_t keyCount>
+bool Less(pmerge::ydb::Key<keyCount> first, pmerge::ydb::Key<keyCount> second) {
+  for (int idx = 0; idx < keyCount; ++idx) {
+    if (first[idx] > second[idx]) {
+      return false;
+    }
+    if (first[idx] < second[idx]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// SlotLess satisfies strict weak ordering.
+template <ui32 keyCount>
+bool SlotLess(const pmerge::ydb::Slot& first, const pmerge::ydb::Slot& second) {
+  if (pmerge::ydb::GetHash(first) < pmerge::ydb::GetHash(second)) {
+    return true;
+  }
+  if (pmerge::ydb::GetHash(first) > pmerge::ydb::GetHash(second)) {
+    return false;
+  }
+  auto first_span = pmerge::ydb::GetKey<keyCount>(first.AsView());
+  auto second_span = pmerge::ydb::GetKey<keyCount>(second.AsView());
+  if (Equal(first_span, second_span)) {
+    return false;
+  }
+  if (Less(first_span, second_span)) {
+    return true;
+  } else {
+    PMERGE_ASSERT(
+        std::ranges::lexicographical_compare(second_span, first_span));
+    return false;
+  }
+}
+template <ui32 keyCount>
+bool SlotEqual(pmerge::ydb::ConstSlotView first,
+               pmerge::ydb::ConstSlotView second) {
+  return pmerge::ydb::GetHash(first) == pmerge::ydb::GetHash(second) &&
+         Equal(pmerge::ydb::GetKey<keyCount>(first),
+               pmerge::ydb::GetKey<keyCount>(second));
 }
 
 }  // namespace pmerge::ydb

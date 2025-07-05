@@ -16,6 +16,7 @@ inline noop_ostr& operator<<(noop_ostr& __os,
                              std::ostream& (*f)(std::ostream&)) {
   return __os;
 }
+namespace detail {
 class Output {
  public:
   void Mute() { muted = true; }
@@ -43,8 +44,8 @@ inline Output& operator<<(Output& ostr, std::ostream& (*f)(std::ostream&)) {
   }
   return ostr;
 }
-
-inline auto output = Output{};
+}  // namespace detail
+inline auto output = detail::Output{};
 }  // namespace pmerge
 
 namespace pmerge::utils {

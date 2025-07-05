@@ -34,31 +34,6 @@ inline std::ostream& operator<<(std::ostream& os, __m256i reg) {
 }  // namespace std
 namespace pmerge::ydb {
 
-template <ui64 keyCount>
-bool Equal(pmerge::ydb::Key<keyCount> first,
-           pmerge::ydb::Key<keyCount> second) {
-  for (int idx = 0; idx < keyCount; ++idx) {
-    if (first[idx] != second[idx]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-template <ui64 keyCount>
-bool LexicographicallyLess(pmerge::ydb::Key<keyCount> first,
-                           pmerge::ydb::Key<keyCount> second) {
-  for (int idx = 0; idx < keyCount; ++idx) {
-    if (first[idx] > second[idx]) {
-      return false;
-    }
-    if (first[idx] < second[idx]) {
-      return true;
-    }
-  }
-  return false;
-}
-
 template <auto keySize>
 uint64_t Hash(pmerge::ydb::Key<keySize> key) {
   return std::accumulate(key.begin(), key.end(), 0ull);
@@ -245,11 +220,11 @@ inline std::vector<pmerge::ydb::Slot> SimpleMultiwayMerge(
 inline auto MakeRandomGenerator(uint64_t low, uint64_t high,
                                 uint64_t seed = 123) {
   struct Generator {
-    std::mt19937_64 rng{seed};
-    std::uniform_int_distribution<uint64_t> distr{low, high};
+    std::mt19937_64 rng;
+    std::uniform_int_distribution<uint64_t> distr;
     uint64_t operator()() noexcept { return distr(rng); }
   };
-  return Generator{};
+  return Generator{.rng{seed}, .distr{low, high}};
 }
 class UnmuteOnExitSuite : public ::testing::Test {
   void TearDown() override { pmerge::output.Unmute(); }
