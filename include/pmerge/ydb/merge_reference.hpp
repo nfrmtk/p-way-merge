@@ -9,13 +9,14 @@
 
 #include <deque>
 #include <iosfwd>
+#include <pmerge/common/print.hpp>
 #include <string_view>
 
 constexpr ui32 slotSize = 8;
 
 template <ui32 keyCount>
 struct TInputData {
-  TInputData() {}
+  TInputData() : Block(nullptr, 0, 0) {}
 
   TInputData(TSpillingBlock block, ui64 *buffer, ui64 bufferSize) {
     Init(block, buffer, bufferSize);
@@ -29,6 +30,7 @@ struct TInputData {
     Buffer = buffer;
     BufferSize = bufferSize;
     Record = Buffer;
+    pmerge::println("[[reference]] Init Record[0]: {}", Record[0]);
     EndOfBuffer = Buffer;
   }
 
@@ -58,6 +60,7 @@ struct TInputData {
     if (Record >= EndOfBuffer) {
       return mask;
     }
+    pmerge::println("[[reference]] Record[0]: {}", Record[0]);
     if (mask == 0) {
       count = Record[slotSize - 1];
       record = Record;
@@ -161,14 +164,18 @@ ui32 merge2pway(ui64 *partBuffer, ui32 partBufferSize, TSpilling &sp,
 
     ui32 use = 0;
     for (ui32 i = 0; i < n; i++) {
+      pmerge::output << std::format("[[reference]] use: 0x{:b}\n", use);
       use = data[i].Compare(record, count, use, 1 << i);
     }
 
     if constexpr (finalize) {
       auto recordm = mergeBuffer + indexm * (keyCount + 2);
+
       std::copy(record, record + 1 + keyCount, recordm);
       recordm[keyCount + 1] = count;
     } else {
+      pmerge::output << std::format("[[reference]] write hash to memory: {}\n",
+                                    record[0]);
       auto recordm = mergeBuffer + indexm * slotSize;
       std::copy(record, record + 1 + keyCount, recordm);
       recordm[slotSize - 1] = count;

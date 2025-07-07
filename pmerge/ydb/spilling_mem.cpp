@@ -48,6 +48,11 @@ void TSpilling::Load(TSpillingBlock block, ui64 offset, void* buffer,
       std::format(
           "Load only full blocks of 64 bytes, (got [{}, {}) bytes instead)",
           offset, offset + size));
+  PMERGE_ASSERT_M(
+      offset + size <= block.BlockSize,
+      std::format("reading past the last element of TSpillingBlock(reading "
+                  "range is [{};{}), size is {} )",
+                  offset, offset + size, block.BlockSize));
   std::memcpy(buffer, static_cast<char*>(block.ExternalMemory) + offset, size);
   ReadChunkCount += (size + (ChunkSize - 1)) / ChunkSize;
   std::this_thread::sleep_for(

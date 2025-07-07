@@ -1,7 +1,9 @@
 #pragma once
+#include <format>
 #include <iostream>
 #include <ostream>
 #include <string_view>
+#include <utility>
 
 namespace pmerge {
 struct noop_ostr {
@@ -16,6 +18,7 @@ inline noop_ostr& operator<<(noop_ostr& __os,
                              std::ostream& (*f)(std::ostream&)) {
   return __os;
 }
+namespace detail {
 class Output {
  public:
   void Mute() { muted = true; }
@@ -38,13 +41,20 @@ Output& operator<<(Output& ostr, const T& val) {
 }
 
 inline Output& operator<<(Output& ostr, std::ostream& (*f)(std::ostream&)) {
+#ifndef NDEBUG
   if (!ostr.muted) {
     std::cout << f;
   }
+#endif
   return ostr;
 }
+}  // namespace detail
+inline auto output = detail::Output{};
 
-inline auto output = Output{};
+template <typename... Args>
+inline void println(std::format_string<Args...> fmt, Args&&... args) {
+  output << std::format(fmt, std::forward<Args>(args)...) << std::endl;
+}
 }  // namespace pmerge
 
 namespace pmerge::utils {

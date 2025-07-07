@@ -10,41 +10,52 @@
 #include <span>
 
 #include "pmerge/common/assert.hpp"
+#include "pmerge/common/print.hpp"
 namespace pmerge::ydb {
 
 class SpillingBlocksWriter {
  public:
   SpillingBlocksWriter(TSpilling& stats, TSpillingBlock external_memory,
                        std::span<uint64_t> buffer)
-      : stats_(stats), external_memory_(external_memory), buffer_(buffer) {}
-  void Write(SlotView slot) {
+      : stats_(stats),
+        external_memory_(external_memory),
+        buffer_(buffer),
+        buffer_left_(buffer_) {}
+  void Write(ConstSlotView slot) {
     total_writes_++;
     if (buffer_left_.empty()) {
       Flush();
     }
-
-    buffer_left_ = slot;
+    std::ranges::copy(slot, buffer_left_.data());
+    pmerge::output << std::format("[[my]] write hash to memory: {}\n",
+                                  GetHash(Slot::FromView(slot)));
 
     buffer_left_ = buffer_left_.subspan(8);
   }
   void Flush() {
-    external_memory_ = stats_.Append(external_memory_, buffer_left_.data(),
-                                     buffer_left_.size_bytes());
+    size_t bytes_flushed = buffer_.size_bytes() - buffer_left_.size_bytes();
+    external_memory_ =
+        stats_.Append(external_memory_, buffer_.data(), bytes_flushed);
     buffer_left_ = buffer_;
+    std::cout << std::format(
+                     "write another {} bytes to memory, currently {} bytes in "
+                     "external storage",
+                     bytes_flushed, external_memory_.BlockSize)
+              << std::endl;
   }
   ~SpillingBlocksWriter() {
-    PMERGE_ASSERT_M(buffer_left_.size() == 0,
+    PMERGE_ASSERT_M(buffer_left_.size() == buffer_.size(),
                     "writer buffer dropping some slots not written to memory");
   }
+  auto GetExternalMemory() { return external_memory_; }
   int64_t TotalWrites() const { return total_writes_; }
 
  private:
   TSpilling& stats_;
-  int64_t total_writes_;
+  int64_t total_writes_ = 0;
   TSpillingBlock external_memory_;
-  std::span<uint64_t> buffer_left_;
   const std::span<uint64_t> buffer_;
+  std::span<uint64_t> buffer_left_;
 };
-
 }  // namespace pmerge::ydb
 #endif  // SPILLING_BLOCKS_WRITER_HPP

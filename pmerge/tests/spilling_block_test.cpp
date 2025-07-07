@@ -52,16 +52,7 @@ void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
   Defer delete_external_mem = [&]() noexcept { stats.Delete(external_memory); };
   auto buffer = MakeBuffer(4);
   std::vector<pmerge::IntermediateInteger> packed{
-      key_data | std::views::chunk(KeySize) |
-      std::views::transform([&](auto nums) {
-        std::array<uint64_t, KeySize> keys{{}};
-        for (int idx = 0; idx < KeySize; ++idx) {
-          keys[idx] = nums[idx];
-        }
-        return pmerge::PackFrom(
-            pmerge::ydb::Hash(pmerge::ydb::Key<KeySize>{keys}), resource_index);
-      }) |
-      std::ranges::to<std::vector<pmerge::IntermediateInteger>>()};
+      SpillBlockToInts<KeySize>(stats, external_memory, resource_index)};
   std::ranges::sort(packed);
   pmerge::output << "packed: ";
   PrintIntermediateIntegersRange(packed);

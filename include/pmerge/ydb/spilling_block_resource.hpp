@@ -80,7 +80,9 @@ class SpillingBlockBufferedResource {
                                 std::bitset<IndexSizeBits> resource_identifier)
       : resource_identifier_(resource_identifier),
         stats_(spilling),
-        blocks_reader_(SpillingBlocksBuffer{spilling, block, my_buffer}),
+        blocks_reader_(
+            SpillingBlocksBuffer{spilling, block, my_buffer},
+            std::format("resource-{}", resource_identifier.to_ullong())),
         current_vec_(GetOneHelper()),
         total_slots_(block.BlockSize >> 6) {
     static_assert(
@@ -116,13 +118,13 @@ class SpillingBlockBufferedResource {
       return simd::kInfVector;
     }
     if (currently_processed_slots_ + 4 >
-        total_slots_) {  // once per this resource
+        total_slots_) {  // at most once per this resource
       IntermediateInteger pack[4] = {kInf, kInf, kInf, kInf};
-      int slots_left = total_slots_ - currently_processed_slots_ - 1;
+      int slots_left = total_slots_ - currently_processed_slots_;
       PMERGE_ASSERT(slots_left >= 0);
-      PMERGE_ASSERT(slots_left < 3);
+      PMERGE_ASSERT(slots_left < 4);
       for (int idx = 0; idx < slots_left; ++idx) {
-        pack[idx + 1] = GetPackedInt();
+        pack[idx] = GetPackedInt();
       }
       return pmerge::simd::MakeFrom(pack[0], pack[1], pack[2], pack[3]);
     }

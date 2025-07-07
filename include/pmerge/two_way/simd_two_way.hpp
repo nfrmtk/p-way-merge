@@ -59,7 +59,7 @@ class SimdTwoWayMerger {
   void PrintRegister(
       std::string_view prefix = "",
       std::source_location loc = std::source_location::current()) const {
-#ifndef NDEBUG
+#if false
     if (print_registers_) {
       pmerge::output << std::format(
           "state: {},  min: {}, max: {}, header line number: {}\n", prefix,

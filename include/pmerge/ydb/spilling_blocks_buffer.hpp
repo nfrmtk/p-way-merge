@@ -18,24 +18,24 @@ class SpillingBlocksBuffer {
       : spilling_(spilling),
         external_memory_(external_memory),
         buffer_(buffer) {
-    PMERGE_ASSERT_M(external_memory_.BlockSize % buffer_.size_bytes() == 0,
-                    "external memory should be spilttable by buffers");
     AssertSplittableBySlots(buffer);
   }
   std::span<uint64_t> ResetBuffer() {
-    if (external_memory_.BlockSize == buffer_.size_bytes() * buffers_read_) {
+    int next_chunk_size_bytes = std::min(
+        buffer_.size_bytes(), external_memory_.BlockSize - bytes_read_);
+    if (next_chunk_size_bytes == 0) {
       return {};
     }
-    spilling_.Load(external_memory_, buffer_.size_bytes() * buffers_read_,
-                   buffer_.data(), buffer_.size_bytes());
-    ++buffers_read_;
-    return buffer_;
+    spilling_.Load(external_memory_, bytes_read_, buffer_.data(),
+                   next_chunk_size_bytes);
+    bytes_read_ += next_chunk_size_bytes;
+    return buffer_.subspan(0, next_chunk_size_bytes / 8);
   }
 
  private:
   TSpilling& spilling_;
   TSpillingBlock external_memory_;
-  int64_t buffers_read_ = 0;
+  int64_t bytes_read_ = 0;
   std::span<uint64_t> buffer_;
 };
 

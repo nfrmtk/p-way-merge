@@ -29,3 +29,9 @@ cmake --build . --target merge_test_ut
 ```
 
 На данный момент работают тесты merge_test, pack_test, simd_two_way_vector_resource_test и spilling_block_test.cpp.
+
+
+### environment
+
+выставляются для бинаря, не для билда.
+PMERGE_FORCE_MUTE_STDOUT - отключить дебажные логи, с ними многие тесты сильно тормозят.

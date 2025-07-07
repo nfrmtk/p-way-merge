@@ -6,6 +6,7 @@
 #define SPILLING_BLOCK_READER_HPP
 #include <pmerge/ydb/spilling_blocks_buffer.hpp>
 
+#include "pmerge/common/print.hpp"
 #include "pmerge/common/resource.hpp"
 #include "pmerge/simd/utils.hpp"
 #include "pmerge/ydb/types.hpp"
@@ -15,14 +16,18 @@ namespace pmerge::ydb {
 class SpillingBlockReader {
  public:
   explicit SpillingBlockReader(
-      const SpillingBlocksBuffer &external_memory_cache)
-      : external_memory_cache_(external_memory_cache) {}
+      const SpillingBlocksBuffer &external_memory_cache, std::string name)
+      : external_memory_cache_(external_memory_cache), name_(std::move(name)) {}
   SlotView AdvanceByOne() {
     pmerge::output << std::format("slots left in storage: {}",
                                   slots_not_read_.size() >> 3)
                    << std::endl;
     if (slots_not_read_.empty()) {
       slots_not_read_ = external_memory_cache_.ResetBuffer();
+      pmerge::output << std::format(
+                            "reader '{}' read from external memory {} bytes",
+                            name_, slots_not_read_.size_bytes())
+                     << std::endl;
       PMERGE_ASSERT_M(!slots_not_read_.empty(), "reading past-the-end block");
     }
     auto next = GetSlot(slots_not_read_);
@@ -34,6 +39,7 @@ class SpillingBlockReader {
  private:
   SpillingBlocksBuffer external_memory_cache_;
   std::span<uint64_t> slots_not_read_;
+  std::string name_;
 };
 
 }  // namespace pmerge::ydb
