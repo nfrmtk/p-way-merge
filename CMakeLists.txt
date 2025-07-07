@@ -18,7 +18,7 @@ target_link_options(pmerge PUBLIC "-fuse-ld=lld")
 target_compile_options(pmerge PUBLIC "-fsanitize=address,undefined")
 target_link_options(pmerge PUBLIC "-fsanitize=address,undefined")
 
-set(WORKING_TESTS "merge_test;pack_test;simd_two_way_vector_resource_test;loser_tree_test;spilling_block_test" LIST)
+set(WORKING_TESTS "merge_test;pack_test;simd_two_way_vector_resource_test;loser_tree_test;spilling_block_test;ydb_interface_merge_test" LIST)
 
 target_include_directories(pmerge PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include")
 

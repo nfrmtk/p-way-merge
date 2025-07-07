@@ -36,9 +36,16 @@ auto MakeSpillBlocksDeque(TSpilling& stats, auto& keys_gen, auto& counts_gen,
                           auto& sizes_gen) {
   std::deque<TSpillingBlock> external_memory_chunks;
 
-  for (int _ = 0; _ < (1 << TreeDepth); ++_) {
+  for (int chunk_idx = 0; chunk_idx < (1 << TreeDepth); ++chunk_idx) {
+    pmerge::println("chunk #{}", chunk_idx);
     external_memory_chunks.emplace_back(pmerge::ydb::MakeSlotsBlock<KeySize>(
-        stats, [&]() { return keys_gen(); }, [&]() { return counts_gen(); },
+        stats, [&]() { return keys_gen(); },
+        [&]() {
+          auto count = counts_gen();
+          PMERGE_ASSERT_M(count != 0,
+                          "aggregate 0 optimisation not supported yet");
+          return count;
+        },
         sizes_gen()));
   }
   return external_memory_chunks;
@@ -135,12 +142,24 @@ TYPED_TEST(YDBInterfaceMerge, Small) {
       []() { return 1; }, [&kSize] { return kSize; });
 }
 
+TYPED_TEST(YDBInterfaceMerge, SmallRandom) {
+  constexpr size_t kKeySize = TypeParam::value.first;
+  constexpr size_t kDepth = TypeParam::value.second;
+  constexpr size_t kSize = 1;
+  auto rnd_keys = MakeRandomGenerator(0, 1 << 20);
+  auto rnd_counts = MakeRandomGenerator(1, 15);
+  auto rnd_sizes = MakeRandomGenerator(1, 1);
+  YDBInterfaceTest<kKeySize, kDepth>([&]() { return rnd_keys(); },
+                                     [&]() { return rnd_counts(); },
+                                     [&] { return 1; });
+}
+
 TYPED_TEST(YDBInterfaceMerge, Random) {
   constexpr size_t kKeySize = TypeParam::value.first;
   constexpr size_t kDepth = TypeParam::value.second;
   constexpr size_t kSize = 1;
   auto rnd_keys = MakeRandomGenerator(0, 1 << 20);
-  auto rnd_counts = MakeRandomGenerator(0, 15);
+  auto rnd_counts = MakeRandomGenerator(1, 15);
   auto rnd_sizes = MakeRandomGenerator(50, 100);
   YDBInterfaceTest<kKeySize, kDepth>([&]() { return rnd_keys(); },
                                      [&]() { return rnd_counts(); },

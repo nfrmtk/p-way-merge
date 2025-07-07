@@ -25,8 +25,12 @@
   } while (0)
 
 #else
-#define PMERGE_ASSERT(condition, message)
-#define PMERGE_ASSERT(condition)
+#define PMERGE_ASSERT_M(condition, message) \
+  {}
+
+#define PMERGE_ASSERT(condition) \
+  {}
+
 #endif
 
 #endif  // ASSERT_HPP

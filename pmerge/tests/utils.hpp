@@ -12,6 +12,8 @@
 #include <algorithm>
 #include <bitset>
 #include <cstdint>
+#include <cstdlib>
+#include <format>
 #include <memory>
 #include <numeric>
 #include <ostream>
@@ -65,6 +67,8 @@ TSpillingBlock MakeSlotsBlock(TSpilling& stats, auto keys_gen, auto counts_gen,
     std::generate_n(&this_slot->nums[1], keySize, [&] { return keys_gen(); });
     this_slot->nums[0] =
         Hash(pmerge::ydb::GetKey<keySize>(ConstSlotView{this_slot->nums}));
+    pmerge::output << std::format("[[generation]] write hash to memory: {}\n",
+                                  this_slot->nums[0]);
     this_slot->nums[7] = counts_gen();
   }
   std::sort(storage.get(), storage.get() + size_slots, SlotLess<keySize>);
@@ -202,6 +206,11 @@ inline std::vector<int64_t> SimpleMultiwayMerge(
   return tmp;
 }
 
+inline bool ForceMuteStdout() {
+  auto str = std::getenv("PMERGE_FORCE_MUTE_STDOUT");
+  return str != nullptr && std::string{str} == "ON";
+}
+
 inline std::vector<pmerge::ydb::Slot> SimpleMultiwayMerge(
     const std::ranges::range auto& nums)
   requires std::same_as<std::vector<pmerge::ydb::Slot>,
@@ -227,6 +236,11 @@ inline auto MakeRandomGenerator(uint64_t low, uint64_t high,
   return Generator{.rng{seed}, .distr{low, high}};
 }
 class UnmuteOnExitSuite : public ::testing::Test {
+  void SetUp() override {
+    if (ForceMuteStdout()) {
+      pmerge::output.Mute();
+    }
+  }
   void TearDown() override { pmerge::output.Unmute(); }
 };
 

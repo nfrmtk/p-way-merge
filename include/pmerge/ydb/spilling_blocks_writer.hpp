@@ -27,7 +27,7 @@ class SpillingBlocksWriter {
       Flush();
     }
     std::ranges::copy(slot, buffer_left_.data());
-    pmerge::output << std::format("write hash to memory: {}\n",
+    pmerge::output << std::format("[[my]] write hash to memory: {}\n",
                                   GetHash(Slot::FromView(slot)));
 
     buffer_left_ = buffer_left_.subspan(8);
