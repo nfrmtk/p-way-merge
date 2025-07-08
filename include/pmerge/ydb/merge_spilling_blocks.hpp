@@ -83,7 +83,8 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
     const uint64_t current_hash_bits = *pmerge::ExtractCutHash<p>(this_num);
     while (!nums_left.empty() &&
            *pmerge::ExtractCutHash<p>(this_num) == current_hash_bits) {
-      pmerge::output << pmerge::MakeReadableString(this_num);
+      PMERGE_ASSERT_M(this_num != kInf, "only real numbers here are allowed");
+      pmerge::println("{}", this_num - std::numeric_limits<int64_t>::min());
       size_t index = pmerge::ExtractIdentifer<p>(this_num)->to_ullong();
       slots.emplace_back(Slot::FromView(output_readers[index].AdvanceByOne()));
       this_num = read_num();

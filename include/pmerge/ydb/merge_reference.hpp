@@ -185,9 +185,9 @@ ui32 merge2pway(ui64 *partBuffer, ui32 partBufferSize, TSpilling &sp,
     for (ui32 i = 0; i < n; i++) {
       data[i].IncIfUse(use, 1 << i);
     }
-    if ((result + indexm) % 32768 == 0) {
+    if ((result + indexm) % kCurrentIntervalSlots == 0) {
       static WriteInterval reference_write_interval;
-      reference_write_interval.WriteHappend(32768);
+      reference_write_interval.WriteHappend(kCurrentIntervalSlots);
     }
 
     if (++indexm == mergeBufferSize) {

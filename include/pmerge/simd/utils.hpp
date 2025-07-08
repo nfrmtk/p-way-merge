@@ -36,6 +36,7 @@ T GetAtPos(__m256i reg) {
 }
 std::string ToString(__m256i reg);
 
+
 std::string ToHexString(__m256i reg);
 
 inline std::array<int64_t, 4> AsArray(__m256i reg) {
@@ -57,5 +58,12 @@ inline IntermediateInteger Get64MostSignificantBits(const __m256i& reg) {
 namespace pmerge {
 std::string ToStringHex(int64_t num);
 
+}
+
+namespace std {
+template <>
+struct formatter<__m256i> {
+
+};
 }
 #endif  // SIMD_UTILS_HPP

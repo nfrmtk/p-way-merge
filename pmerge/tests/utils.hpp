@@ -296,13 +296,7 @@ template <size_t KeySize, size_t TreeDepth>
 auto MakeSpillBlocksDeque(TSpilling& stats, auto& keys_gen, auto& counts_gen,
                           auto& sizes_gen) {
   std::deque<TSpillingBlock> external_memory_chunks;
-  std::vector<size_t> sizes =
-      std::views::iota(0, 1 << TreeDepth) |
-      std::views::transform([&](int) { return sizes_gen(); }) |
-      std::ranges::to<std::vector<size_t>>();
-  std::cout << std::format("total size in bytes: {}",
-                           std::accumulate(sizes.begin(), sizes.end(), 0))
-            << std::endl;
+  int64_t total_size_slots = 0;
   for (int chunk_idx = 0; chunk_idx < (1 << TreeDepth); ++chunk_idx) {
     pmerge::println("chunk #{}", chunk_idx);
     external_memory_chunks.emplace_back(pmerge::ydb::MakeSlotsBlock<KeySize>(
@@ -314,7 +308,10 @@ auto MakeSpillBlocksDeque(TSpilling& stats, auto& keys_gen, auto& counts_gen,
           return count;
         },
         sizes_gen()));
+    total_size_slots += external_memory_chunks.back().BlockSize / 64;
+
   }
+  std::cout << std::format("total slots amount: {}", total_size_slots);
   return external_memory_chunks;
 }
 

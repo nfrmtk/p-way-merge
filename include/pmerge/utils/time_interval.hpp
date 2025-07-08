@@ -25,3 +25,5 @@ class WriteInterval {
  private:
   TimeInterval interval_{};
 };
+
+static constexpr int kCurrentIntervalSlots = 1 << 17;

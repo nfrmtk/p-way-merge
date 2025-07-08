@@ -15,6 +15,7 @@ find_package(GTest REQUIRED)
 add_library(pmerge ${PMERGE_SOURCES})
 target_compile_options(pmerge PUBLIC "-mavx2")
 target_compile_options(pmerge PUBLIC "-fuse-ld=lld")
+target_compile_options(pmerge PUBLIC "-fno-omit-frame-pointer")
 target_link_options(pmerge PUBLIC "-fuse-ld=lld")
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
