@@ -34,9 +34,11 @@ class Output {
 };
 template <typename T>
 Output& operator<<(Output& ostr, const T& val) {
+#ifndef NDEBUG
   if (!ostr.muted) {
     std::cout << val;
   }
+#endif
   return ostr;
 }
 
@@ -53,7 +55,9 @@ inline auto output = detail::Output{};
 
 template <typename... Args>
 inline void println(std::format_string<Args...> fmt, Args&&... args) {
+#ifndef NDEBUG
   output << std::format(fmt, std::forward<Args>(args)...) << std::endl;
+#endif
 }
 }  // namespace pmerge
 

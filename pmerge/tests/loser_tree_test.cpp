@@ -11,10 +11,10 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "gtest_utils.hpp"
 #include "pmerge/common/print.hpp"
 #include "pmerge/common/resource.hpp"
 #include "pmerge/simd/utils.hpp"
-#include "utils.hpp"
 using pmerge::common::FromDataAndIndex;
 
 template <typename Number>

@@ -11,8 +11,10 @@
 
 #include <algorithm>
 #include <bitset>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <deque>
 #include <format>
 #include <memory>
 #include <numeric>
@@ -211,6 +213,24 @@ inline bool ForceMuteStdout() {
   return str != nullptr && std::string{str} == "ON";
 }
 
+enum class MultiwayMergeKind { kReference, kSimdLoserTree };
+
+inline std::optional<MultiwayMergeKind> DetectMergeKind() {
+  auto str = std::getenv("PMERGE_MERGE_KIND");
+  if (str == nullptr) {
+    return std::nullopt;
+  }
+  auto strname = std::string{str};
+  if (strname == "reference") {
+    return MultiwayMergeKind::kReference;
+  }
+  if (strname == "simd") {
+    return MultiwayMergeKind::kSimdLoserTree;
+  }
+  std::cerr << std::format("unknown enum value: {}", strname);
+  return std::nullopt;
+}
+
 inline std::vector<pmerge::ydb::Slot> SimpleMultiwayMerge(
     const std::ranges::range auto& nums)
   requires std::same_as<std::vector<pmerge::ydb::Slot>,
@@ -235,14 +255,6 @@ inline auto MakeRandomGenerator(uint64_t low, uint64_t high,
   };
   return Generator{.rng{seed}, .distr{low, high}};
 }
-class UnmuteOnExitSuite : public ::testing::Test {
-  void SetUp() override {
-    if (ForceMuteStdout()) {
-      pmerge::output.Mute();
-    }
-  }
-  void TearDown() override { pmerge::output.Unmute(); }
-};
 
 std::vector<pmerge::IntermediateInteger> AsVector(
     pmerge::Resource auto& resource) {
@@ -278,6 +290,32 @@ void TestResource(pmerge::Resource auto& tested_resouce,
                        pmerge::MakeReadableString(test_vector[idx]),
                        pmerge::MakeReadableString(answer[idx]));
   }
+}
+
+template <size_t KeySize, size_t TreeDepth>
+auto MakeSpillBlocksDeque(TSpilling& stats, auto& keys_gen, auto& counts_gen,
+                          auto& sizes_gen) {
+  std::deque<TSpillingBlock> external_memory_chunks;
+  std::vector<size_t> sizes =
+      std::views::iota(0, 1 << TreeDepth) |
+      std::views::transform([&](int) { return sizes_gen(); }) |
+      std::ranges::to<std::vector<size_t>>();
+  std::cout << std::format("total size in bytes: {}",
+                           std::accumulate(sizes.begin(), sizes.end(), 0))
+            << std::endl;
+  for (int chunk_idx = 0; chunk_idx < (1 << TreeDepth); ++chunk_idx) {
+    pmerge::println("chunk #{}", chunk_idx);
+    external_memory_chunks.emplace_back(pmerge::ydb::MakeSlotsBlock<KeySize>(
+        stats, [&]() { return keys_gen(); },
+        [&]() {
+          auto count = counts_gen();
+          PMERGE_ASSERT_M(count != 0,
+                          "aggregate 0 optimisation not supported yet");
+          return count;
+        },
+        sizes_gen()));
+  }
+  return external_memory_chunks;
 }
 
 #endif  // UTILS_HPP

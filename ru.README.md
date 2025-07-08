@@ -35,3 +35,6 @@ cmake --build . --target merge_test_ut
 
 выставляются для бинаря, не для билда.
 PMERGE_FORCE_MUTE_STDOUT - отключить дебажные логи, с ними многие тесты сильно тормозят.
+
+PMERGE_MERGE_KIND - для pmerge/tests/bench.cpp, позволяет определить, какой алгоритм тестируется - референсный линейный или simd.
+можно выставить либо в reference либо в simd

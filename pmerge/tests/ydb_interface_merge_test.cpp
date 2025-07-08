@@ -15,10 +15,10 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "gtest_utils.hpp"
 #include "pmerge/common/assert.hpp"
 #include "pmerge/common/print.hpp"
 #include "pmerge/ydb/spilling_mem.h"
-#include "utils.hpp"
 
 auto MakeRandomSpillBlocksDeque(TSpilling& stats) {
   std::deque<TSpillingBlock> external_memory_chunks;
@@ -31,26 +31,6 @@ auto MakeRandomSpillBlocksDeque(TSpilling& stats) {
 
   return external_memory_chunks;
 }
-template <size_t KeySize, size_t TreeDepth>
-auto MakeSpillBlocksDeque(TSpilling& stats, auto& keys_gen, auto& counts_gen,
-                          auto& sizes_gen) {
-  std::deque<TSpillingBlock> external_memory_chunks;
-
-  for (int chunk_idx = 0; chunk_idx < (1 << TreeDepth); ++chunk_idx) {
-    pmerge::println("chunk #{}", chunk_idx);
-    external_memory_chunks.emplace_back(pmerge::ydb::MakeSlotsBlock<KeySize>(
-        stats, [&]() { return keys_gen(); },
-        [&]() {
-          auto count = counts_gen();
-          PMERGE_ASSERT_M(count != 0,
-                          "aggregate 0 optimisation not supported yet");
-          return count;
-        },
-        sizes_gen()));
-  }
-  return external_memory_chunks;
-}
-
 auto AsCharPointer(TSpillingBlock block) {
   return static_cast<const char*>(block.ExternalMemory);
 }
