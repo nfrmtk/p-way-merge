@@ -110,10 +110,8 @@ class SpillingBlockBufferedResource {
 
  private:
   __m256i GetOneHelper() {
-    pmerge::output << std::format(
-                          "currently_processed_slots_: {}, total_slots_: {}",
-                          currently_processed_slots_, total_slots_)
-                   << std::endl;
+    pmerge::println("currently_processed_slots_: {}, total_slots_: {}",
+                    currently_processed_slots_, total_slots_);
     if (currently_processed_slots_ >= total_slots_) {
       return simd::kInfVector;
     }

@@ -17,7 +17,7 @@ int main() {
   }
   TSpilling stats{8 * 1024 * 1024};
   auto rng_keys = MakeRandomGenerator(0, std::numeric_limits<size_t>::max());
-  auto rng_sizes = MakeRandomGenerator(32768, 98303);
+  auto rng_sizes = MakeRandomGenerator(131072, 131072 * 3 - 1);
   std::vector<uint64_t> buff;
   constexpr int kBuffSizeSlots = 96 * 8;
   buff.resize(kBuffSizeSlots * 8);

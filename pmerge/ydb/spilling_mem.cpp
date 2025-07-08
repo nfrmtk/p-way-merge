@@ -55,8 +55,6 @@ void TSpilling::Load(TSpillingBlock block, ui64 offset, void* buffer,
                   offset, offset + size, block.BlockSize));
   std::memcpy(buffer, static_cast<char*>(block.ExternalMemory) + offset, size);
   ReadChunkCount += (size + (ChunkSize - 1)) / ChunkSize;
-  std::this_thread::sleep_for(
-      std::chrono::microseconds{20});  // dont read by 8 bytes
 }
 
 void TSpilling::Delete(TSpillingBlock block) {

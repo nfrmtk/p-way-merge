@@ -24,9 +24,9 @@ class SpillingBlocksWriter {
         buffer_left_(buffer_) {}
   void Write(ConstSlotView slot) {
     total_writes_++;
-    if (total_writes_ % 8192 == 0) {
+    if (total_writes_ % 32768 == 0) {
       static WriteInterval write_interval;
-      write_interval.Write8192Happend();
+      write_interval.WriteHappend(32768);
     }
     if (buffer_left_.empty()) {
       Flush();

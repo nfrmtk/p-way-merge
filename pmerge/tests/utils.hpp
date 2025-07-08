@@ -69,8 +69,8 @@ TSpillingBlock MakeSlotsBlock(TSpilling& stats, auto keys_gen, auto counts_gen,
     std::generate_n(&this_slot->nums[1], keySize, [&] { return keys_gen(); });
     this_slot->nums[0] =
         Hash(pmerge::ydb::GetKey<keySize>(ConstSlotView{this_slot->nums}));
-    pmerge::output << std::format("[[generation]] write hash to memory: {}\n",
-                                  this_slot->nums[0]);
+    pmerge::println("[[generation]] write hash to memory: {}\n",
+                    this_slot->nums[0]);
     this_slot->nums[7] = counts_gen();
   }
   std::sort(storage.get(), storage.get() + size_slots, SlotLess<keySize>);

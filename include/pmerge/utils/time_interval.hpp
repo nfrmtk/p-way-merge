@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstddef>
 #include <iostream>
 class TimeInterval {
  public:
@@ -16,8 +17,8 @@ class TimeInterval {
 class WriteInterval {
  public:
   WriteInterval() { interval_.Reset(); }
-  void Write8192Happend() {
-    std::cout << std::format("8192 writes done in {}", interval_.Reset())
+  void WriteHappend(size_t bytes) {
+    std::cout << std::format("{} writes done in {}", bytes, interval_.Reset())
               << std::endl;
   }
 
