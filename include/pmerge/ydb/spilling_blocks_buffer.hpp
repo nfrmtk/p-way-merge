@@ -31,6 +31,7 @@ class SpillingBlocksBuffer {
     bytes_read_ += next_chunk_size_bytes;
     return buffer_.subspan(0, next_chunk_size_bytes / 8);
   }
+  int64_t TotalBytes() const { return external_memory_.BlockSize; }
 
  private:
   TSpilling& spilling_;

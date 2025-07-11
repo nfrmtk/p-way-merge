@@ -80,13 +80,18 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
     slots.clear();
     PMERGE_ASSERT_M(!nums_left.empty(), "numbers shouldn't be empty");
     pmerge::IntermediateInteger this_num = nums_left.front();
+    utils::PrintIntermediateIntegersRange(nums_left);
     const uint64_t current_hash_bits = *pmerge::ExtractCutHash<p>(this_num);
     while (!nums_left.empty() &&
            *pmerge::ExtractCutHash<p>(this_num) == current_hash_bits) {
       PMERGE_ASSERT_M(this_num != kInf, "only real numbers here are allowed");
       pmerge::println("{}", this_num - std::numeric_limits<int64_t>::min());
       size_t index = pmerge::ExtractIdentifer<p>(this_num)->to_ullong();
-      slots.emplace_back(Slot::FromView(output_readers[index].AdvanceByOne()));
+      pmerge::println("index received for hash '{}': {}", current_hash_bits,
+                      index);
+      auto next = output_readers[index].GetNextValid();
+      PMERGE_ASSERT(next.has_value());
+      slots.emplace_back(Slot::FromView(*next));
       this_num = read_num();
     }
   };

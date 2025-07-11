@@ -17,7 +17,9 @@ target_compile_options(pmerge PUBLIC "-mavx2")
 target_compile_options(pmerge PUBLIC "-fuse-ld=lld")
 target_compile_options(pmerge PUBLIC "-fno-omit-frame-pointer")
 target_link_options(pmerge PUBLIC "-fuse-ld=lld")
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+message(STATUS "CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
+
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
     set(_SUGGEST_SANITIZE ON)
 else()
@@ -25,9 +27,11 @@ else()
 endif()
 
 option(PMERGE_SANITIZE _SUGGEST_SANITIZE)
+set(PMERGE_SANITIZE ON)
 
+message(STATUS ${PMERGE_SANITIZE})
 if (PMERGE_SANITIZE)
-message(status "choosing non-instrumented build")
+    message(STATUS  "choosing instrumented build")
     target_compile_options(pmerge PUBLIC "-fsanitize=address,undefined")
     target_link_options(pmerge PUBLIC "-fsanitize=address,undefined")
 endif()

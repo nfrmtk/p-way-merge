@@ -41,9 +41,9 @@ class SpillingBlocksWriter {
         stats_.Append(external_memory_, buffer_.data(), bytes_flushed);
     buffer_left_ = buffer_;
     pmerge::println(
-               "write another {} bytes to memory, currently {} bytes in "
-               "external storage",
-               bytes_flushed, external_memory_.BlockSize);
+        "write another {} bytes to memory, currently {} bytes in "
+        "external storage",
+        bytes_flushed, external_memory_.BlockSize);
   }
   ~SpillingBlocksWriter() {
     PMERGE_ASSERT_M(buffer_left_.size() == buffer_.size(),

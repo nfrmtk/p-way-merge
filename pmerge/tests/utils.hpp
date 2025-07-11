@@ -115,13 +115,7 @@ std::string RangeToString(std::ranges::range auto&& range) {
   return str;
 }
 
-void PrintIntermediateIntegersRange(std::ranges::range auto&& range) {
-  for (const auto& num : range) {
-    pmerge::utils::PrintIfDebug(pmerge::MakeReadableString(num) + ' ');
-  }
-  pmerge::output << std::endl;
-}
-
+using pmerge::utils::PrintIntermediateIntegersRange;
 template <typename T>
 void F() = delete;
 
@@ -309,7 +303,6 @@ auto MakeSpillBlocksDeque(TSpilling& stats, auto& keys_gen, auto& counts_gen,
         },
         sizes_gen()));
     total_size_slots += external_memory_chunks.back().BlockSize / 64;
-
   }
   std::cout << std::format("total slots amount: {}", total_size_slots);
   return external_memory_chunks;

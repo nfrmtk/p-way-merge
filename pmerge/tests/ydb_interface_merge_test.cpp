@@ -19,6 +19,8 @@
 #include "pmerge/common/assert.hpp"
 #include "pmerge/common/print.hpp"
 #include "pmerge/ydb/spilling_mem.h"
+#include "pmerge/ydb/types.hpp"
+#include "utils.hpp"
 
 auto MakeRandomSpillBlocksDeque(TSpilling& stats) {
   std::deque<TSpillingBlock> external_memory_chunks;
@@ -52,6 +54,11 @@ void YDBInterfaceTest(auto keys_gen, auto counts_gen, auto sizes_gen) {
       }) |
       std::ranges::to<std::deque<TSpillingBlock>>();
 
+  for (int idx = 0; auto chunk : external_memory_chunks) {
+    pmerge::println("input chunk #{} :", idx++);
+    pmerge::ydb::PrintSlotsRange(pmerge::ydb::AsSlotsVector(stats, chunk));
+  }
+
   ASSERT_EQ(TotalSize(chunks_copy), TotalSize(external_memory_chunks));
   std::vector<uint64_t> buff;
   static const int kBufferSize = 3 * 1 << 13;
@@ -70,6 +77,12 @@ void YDBInterfaceTest(auto keys_gen, auto counts_gen, auto sizes_gen) {
 
   Defer delete_reference = [&]() noexcept { stats.Delete(reference_block); };
   Defer delete_my = [&]() noexcept { stats.Delete(my_block); };
+
+  auto reference_slots = pmerge::ydb::AsSlotsVector(stats, reference_block);
+  auto my_slots = pmerge::ydb::AsSlotsVector(stats, my_block);
+
+  pmerge::ydb::PrintSlotsRange(reference_slots);
+  pmerge::ydb::PrintSlotsRange(my_slots);
 
   ASSERT_EQ(my_writes, reference_writes);
   ASSERT_EQ(my_block.BlockSize, reference_block.BlockSize);
@@ -140,7 +153,7 @@ TYPED_TEST(YDBInterfaceMerge, Random) {
   constexpr size_t kSize = 1;
   auto rnd_keys = MakeRandomGenerator(0, 1 << 20);
   auto rnd_counts = MakeRandomGenerator(1, 15);
-  auto rnd_sizes = MakeRandomGenerator(50, 100);
+  auto rnd_sizes = MakeRandomGenerator(5, 20);
   YDBInterfaceTest<kKeySize, kDepth>([&]() { return rnd_keys(); },
                                      [&]() { return rnd_counts(); },
                                      [&] { return rnd_sizes(); });

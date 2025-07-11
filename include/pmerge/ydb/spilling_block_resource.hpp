@@ -83,8 +83,7 @@ class SpillingBlockBufferedResource {
         blocks_reader_(
             SpillingBlocksBuffer{spilling, block, my_buffer},
             std::format("resource-{}", resource_identifier.to_ullong())),
-        current_vec_(GetOneHelper()),
-        total_slots_(block.BlockSize >> 6) {
+        current_vec_(GetOneHelper()) {
     static_assert(
         pmerge::Resource<
             pmerge::ydb::SpillingBlockBufferedResource<IndexSizeBits>>,
@@ -110,49 +109,20 @@ class SpillingBlockBufferedResource {
 
  private:
   __m256i GetOneHelper() {
-    pmerge::println("currently_processed_slots_: {}, total_slots_: {}",
-                    currently_processed_slots_, total_slots_);
-    if (currently_processed_slots_ >= total_slots_) {
-      return simd::kInfVector;
+    std::array<IntermediateInteger, 4> pack = {kInf, kInf, kInf, kInf};
+    int pack_index = 0;
+    auto slot_or_finished = blocks_reader_.GetNextValid();
+    while (pack_index != 4 && slot_or_finished.has_value()) {
+      pack[pack_index++] =
+          PackFrom(GetHash(*slot_or_finished), resource_identifier_);
+      slot_or_finished = blocks_reader_.GetNextValid();
     }
-    if (currently_processed_slots_ + 4 >
-        total_slots_) {  // at most once per this resource
-      IntermediateInteger pack[4] = {kInf, kInf, kInf, kInf};
-      int slots_left = total_slots_ - currently_processed_slots_;
-      PMERGE_ASSERT(slots_left >= 0);
-      PMERGE_ASSERT(slots_left < 4);
-      for (int idx = 0; idx < slots_left; ++idx) {
-        pack[idx] = GetPackedInt();
-      }
-      return pmerge::simd::MakeFrom(pack[0], pack[1], pack[2], pack[3]);
-    }
-    IntermediateInteger first = GetPackedInt();
-    IntermediateInteger second = GetPackedInt();
-    IntermediateInteger third = GetPackedInt();
-    IntermediateInteger forth = GetPackedInt();
-
-    return pmerge::simd::MakeFrom(first, second, third, forth);
+    return pmerge::simd::MakeFrom(pack);
   }
-  IntermediateInteger GetPackedInt() {
-    currently_processed_slots_++;
-    return PackFrom(GetHash(blocks_reader_.AdvanceByOne()),
-                    resource_identifier_);
-  }
-  // std::span<const Slot> ResetBuffer() {
-  //   auto buff = blocks_buffer_.ResetBuffer();
-  //   PMERGE_ASSERT(
-  //       buff.size() % 4 == 0,
-  //       std::format(
-  //           "buffer needs to be splittable in groups of 4, current size: {}",
-  //           buff.size()));
-  //   return buff;
-  // }
 
   std::bitset<IndexSizeBits> resource_identifier_;
   TSpilling& stats_;
   SpillingBlockReader blocks_reader_;
-  int64_t total_slots_;
-  int64_t currently_processed_slots_ = 0;
   __m256i current_vec_ = simd::kInfVector;
   // pmerge::ydb::SpillingBlocksBuffer blocks_buffer_;
   // std::span<uint64_t> current_buffer_;

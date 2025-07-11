@@ -5,7 +5,7 @@
 #include <pmerge/simd/utils.hpp>
 
 namespace {
-  constexpr const char * kStub = "optimised-out";
+constexpr const char* kStub = "optimised-out";
 }
 std::string pmerge::simd::ToString(__m256i reg) {
 #ifndef NDEBUG
@@ -24,7 +24,7 @@ std::string pmerge::ToStringHex(int64_t num) {
   return std::format("{:x}", num);
 #else
 
-return ::kStub;
+  return ::kStub;
 #endif
 }
 std::string pmerge::simd::ToHexString(__m256i reg) {
@@ -34,7 +34,6 @@ std::string pmerge::simd::ToHexString(__m256i reg) {
                      GetAtPos<size_t, 2>(reg), GetAtPos<size_t, 3>(reg));
 #else
 
-return ::kStub;
+  return ::kStub;
 #endif
-
 }
