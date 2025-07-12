@@ -3,3 +3,5 @@ cmake-build-*
 build
 .cache
 env.sh
+**/perf.data
+**/perf.data.old
