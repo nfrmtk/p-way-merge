@@ -12,6 +12,8 @@
 #include <pmerge/common/print.hpp>
 #include <string_view>
 
+#include "pmerge/ydb/spilling_blocks_writer.hpp"
+
 constexpr ui32 slotSize = 8;
 
 template <ui32 keyCount>
@@ -164,7 +166,7 @@ ui32 merge2pway(ui64 *partBuffer, ui32 partBufferSize, TSpilling &sp,
 
     ui32 use = 0;
     for (ui32 i = 0; i < n; i++) {
-      pmerge::output << std::format("[[reference]] use: 0x{:b}\n", use);
+      pmerge::println("[[reference]] use: 0x{:b}\n", use);
       use = data[i].Compare(record, count, use, 1 << i);
     }
 
@@ -174,8 +176,7 @@ ui32 merge2pway(ui64 *partBuffer, ui32 partBufferSize, TSpilling &sp,
       std::copy(record, record + 1 + keyCount, recordm);
       recordm[keyCount + 1] = count;
     } else {
-      pmerge::output << std::format("[[reference]] write hash to memory: {}\n",
-                                    record[0]);
+      pmerge::println("[[reference]] write hash to memory: {}\n", record[0]);
       auto recordm = mergeBuffer + indexm * slotSize;
       std::copy(record, record + 1 + keyCount, recordm);
       recordm[slotSize - 1] = count;
@@ -183,6 +184,10 @@ ui32 merge2pway(ui64 *partBuffer, ui32 partBufferSize, TSpilling &sp,
 
     for (ui32 i = 0; i < n; i++) {
       data[i].IncIfUse(use, 1 << i);
+    }
+    if ((result + indexm) % kCurrentIntervalSlots == 0) {
+      static WriteInterval reference_write_interval;
+      reference_write_interval.WriteHappend(kCurrentIntervalSlots);
     }
 
     if (++indexm == mergeBufferSize) {

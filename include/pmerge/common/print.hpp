@@ -34,9 +34,11 @@ class Output {
 };
 template <typename T>
 Output& operator<<(Output& ostr, const T& val) {
+#ifndef NDEBUG
   if (!ostr.muted) {
     std::cout << val;
   }
+#endif
   return ostr;
 }
 
@@ -52,9 +54,19 @@ inline Output& operator<<(Output& ostr, std::ostream& (*f)(std::ostream&)) {
 inline auto output = detail::Output{};
 
 template <typename... Args>
-inline void println(std::format_string<Args...> fmt, Args&&... args) {
+void println(std::format_string<Args...> fmt, Args&&... args) {
+#ifndef NDEBUG
   output << std::format(fmt, std::forward<Args>(args)...) << std::endl;
+#endif
 }
+
+template <typename... Args>
+void print(std::format_string<Args...> fmt, Args&&... args) {
+#ifndef NDEBUG
+  output << std::format(fmt, std::forward<Args>(args)...);
+#endif
+}
+
 }  // namespace pmerge
 
 namespace pmerge::utils {
@@ -64,4 +76,13 @@ inline void PrintIfDebug(std::string_view string) {
   pmerge::output << std::endl;
 #endif
 }
+
+void PrintIntermediateIntegersRange(std::ranges::range auto&& range) {
+  println("[ ");
+  for (const auto& num : range) {
+    println("{}, ", num);
+  }
+  println("]");
+}
+
 }  // namespace pmerge::utils

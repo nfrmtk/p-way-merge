@@ -16,6 +16,9 @@ namespace pmerge::simd {
 inline __m256i MakeFrom(int64_t n1, int64_t n2, int64_t n3, int64_t n4) {
   return _mm256_set_epi64x(n4, n3, n2, n1);
 }
+inline __m256i MakeFrom(const std::array<IntermediateInteger, 4>& nums) {
+  return MakeFrom(nums[0], nums[1], nums[2], nums[3]);
+}
 
 template <size_t IndexBits>
 inline __m256i MakeFromDataAndBitset(uint64_t n1, uint64_t n2, uint64_t n3,
@@ -39,9 +42,8 @@ std::string ToString(__m256i reg);
 std::string ToHexString(__m256i reg);
 
 inline std::array<int64_t, 4> AsArray(__m256i reg) {
-  pmerge::output << std::format("pmerge::simd::AsArray reg: {}",
-                                pmerge::simd::ToHexString(reg))
-                 << std::endl;
+  pmerge::println("pmerge::simd::AsArray reg: {}",
+                  pmerge::simd::ToHexString(reg));
   return {GetAtPos<int64_t, 0>(reg), GetAtPos<int64_t, 1>(reg),
           GetAtPos<int64_t, 2>(reg), GetAtPos<int64_t, 3>(reg)};
 }
@@ -59,4 +61,9 @@ namespace pmerge {
 std::string ToStringHex(int64_t num);
 
 }
+
+namespace std {
+template <>
+struct formatter<__m256i> {};
+}  // namespace std
 #endif  // SIMD_UTILS_HPP

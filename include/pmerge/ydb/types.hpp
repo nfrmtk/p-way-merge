@@ -9,6 +9,8 @@
 #include <pmerge/common/assert.hpp>
 #include <source_location>
 #include <span>
+
+#include "pmerge/common/print.hpp"
 typedef uint32_t ui32;
 typedef int32_t i32;
 
@@ -53,6 +55,7 @@ inline ConstSlotView AsView(const Slot& slot) { return slot.nums; }
 inline SlotView AsView(Slot& slot) { return slot.nums; }
 
 inline uint64_t& GetAggregateValue(SlotView slot) { return slot[7]; }
+inline uint64_t GetAggregateValue(ConstSlotView slot) { return slot[7]; }
 template <ui64 KeyCount>
 using Key = std::span<const uint64_t, KeyCount>;
 
@@ -113,6 +116,15 @@ bool SlotEqual(pmerge::ydb::ConstSlotView first,
   return pmerge::ydb::GetHash(first) == pmerge::ydb::GetHash(second) &&
          Equal(pmerge::ydb::GetKey<keyCount>(first),
                pmerge::ydb::GetKey<keyCount>(second));
+}
+inline bool SlotValid(SlotView slot) { return GetAggregateValue(slot) != 0; }
+void PrintSlotsRange(std::ranges::range auto&& slots) {
+  pmerge::print("[ ");
+  for (const Slot& slot : slots) {
+    auto view = slot.AsView();
+    print("(hash: {}, count: {}), ", GetHash(view), GetAggregateValue(view));
+  }
+  pmerge::println(" ]");
 }
 
 }  // namespace pmerge::ydb

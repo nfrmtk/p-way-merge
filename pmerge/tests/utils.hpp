@@ -11,8 +11,10 @@
 
 #include <algorithm>
 #include <bitset>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <deque>
 #include <format>
 #include <memory>
 #include <numeric>
@@ -67,8 +69,8 @@ TSpillingBlock MakeSlotsBlock(TSpilling& stats, auto keys_gen, auto counts_gen,
     std::generate_n(&this_slot->nums[1], keySize, [&] { return keys_gen(); });
     this_slot->nums[0] =
         Hash(pmerge::ydb::GetKey<keySize>(ConstSlotView{this_slot->nums}));
-    pmerge::output << std::format("[[generation]] write hash to memory: {}\n",
-                                  this_slot->nums[0]);
+    pmerge::println("[[generation]] write hash to memory: {}\n",
+                    this_slot->nums[0]);
     this_slot->nums[7] = counts_gen();
   }
   std::sort(storage.get(), storage.get() + size_slots, SlotLess<keySize>);
@@ -88,7 +90,10 @@ inline std::vector<Slot> AsSlotsVector(TSpilling& stats,
 
 template <size_t KeySize, size_t IndexBits>
 auto ToIntermediateIntegers(std::bitset<IndexBits> index) {
-  return std::views::transform([=](const pmerge::ydb::Slot& slot) {
+  return std::views::filter([](const pmerge::ydb::Slot& slot) {
+           return pmerge::ydb::GetAggregateValue(slot.AsView()) != 0;
+         }) |
+         std::views::transform([=](const pmerge::ydb::Slot& slot) {
            return pmerge::PackFrom(pmerge::ydb::GetHash(slot), index);
          }) |
          std::ranges::to<std::vector<pmerge::IntermediateInteger>>();
@@ -113,13 +118,7 @@ std::string RangeToString(std::ranges::range auto&& range) {
   return str;
 }
 
-void PrintIntermediateIntegersRange(std::ranges::range auto&& range) {
-  for (const auto& num : range) {
-    pmerge::utils::PrintIfDebug(pmerge::MakeReadableString(num) + ' ');
-  }
-  pmerge::output << std::endl;
-}
-
+using pmerge::utils::PrintIntermediateIntegersRange;
 template <typename T>
 void F() = delete;
 
@@ -211,6 +210,24 @@ inline bool ForceMuteStdout() {
   return str != nullptr && std::string{str} == "ON";
 }
 
+enum class MultiwayMergeKind { kReference, kSimdLoserTree };
+
+inline std::optional<MultiwayMergeKind> DetectMergeKind() {
+  auto str = std::getenv("PMERGE_MERGE_KIND");
+  if (str == nullptr) {
+    return std::nullopt;
+  }
+  auto strname = std::string{str};
+  if (strname == "reference") {
+    return MultiwayMergeKind::kReference;
+  }
+  if (strname == "simd") {
+    return MultiwayMergeKind::kSimdLoserTree;
+  }
+  std::cerr << std::format("unknown enum value: {}", strname);
+  return std::nullopt;
+}
+
 inline std::vector<pmerge::ydb::Slot> SimpleMultiwayMerge(
     const std::ranges::range auto& nums)
   requires std::same_as<std::vector<pmerge::ydb::Slot>,
@@ -235,14 +252,6 @@ inline auto MakeRandomGenerator(uint64_t low, uint64_t high,
   };
   return Generator{.rng{seed}, .distr{low, high}};
 }
-class UnmuteOnExitSuite : public ::testing::Test {
-  void SetUp() override {
-    if (ForceMuteStdout()) {
-      pmerge::output.Mute();
-    }
-  }
-  void TearDown() override { pmerge::output.Unmute(); }
-};
 
 std::vector<pmerge::IntermediateInteger> AsVector(
     pmerge::Resource auto& resource) {
@@ -280,4 +289,25 @@ void TestResource(pmerge::Resource auto& tested_resouce,
   }
 }
 
+template <size_t KeySize, size_t TreeDepth>
+auto MakeSpillBlocksDeque(TSpilling& stats, auto& keys_gen, auto& counts_gen,
+                          auto& sizes_gen) {
+  std::deque<TSpillingBlock> external_memory_chunks;
+  int64_t total_size_slots = 0;
+  for (int chunk_idx = 0; chunk_idx < (1 << TreeDepth); ++chunk_idx) {
+    pmerge::println("chunk #{}", chunk_idx);
+    external_memory_chunks.emplace_back(pmerge::ydb::MakeSlotsBlock<KeySize>(
+        stats, [&]() { return keys_gen(); },
+        [&]() {
+          auto count = counts_gen();
+          PMERGE_ASSERT_M(count != 0,
+                          "aggregate 0 optimisation not supported yet");
+          return count;
+        },
+        sizes_gen()));
+    total_size_slots += external_memory_chunks.back().BlockSize / 64;
+  }
+  std::cout << std::format("total slots amount: {}", total_size_slots);
+  return external_memory_chunks;
+}
 #endif  // UTILS_HPP

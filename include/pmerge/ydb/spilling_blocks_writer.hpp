@@ -6,6 +6,7 @@
 #define SPILLING_BLOCKS_WRITER_HPP
 #include <pmerge/ydb/spilling_mem.h>
 
+#include <pmerge/utils/time_interval.hpp>
 #include <pmerge/ydb/types.hpp>
 #include <span>
 
@@ -23,12 +24,14 @@ class SpillingBlocksWriter {
         buffer_left_(buffer_) {}
   void Write(ConstSlotView slot) {
     total_writes_++;
+    if (total_writes_ % kCurrentIntervalSlots == 0) {
+      static WriteInterval write_interval;
+      write_interval.WriteHappend(kCurrentIntervalSlots);
+    }
     if (buffer_left_.empty()) {
       Flush();
     }
     std::ranges::copy(slot, buffer_left_.data());
-    pmerge::output << std::format("[[my]] write hash to memory: {}\n",
-                                  GetHash(Slot::FromView(slot)));
 
     buffer_left_ = buffer_left_.subspan(8);
   }
@@ -37,11 +40,10 @@ class SpillingBlocksWriter {
     external_memory_ =
         stats_.Append(external_memory_, buffer_.data(), bytes_flushed);
     buffer_left_ = buffer_;
-    std::cout << std::format(
-                     "write another {} bytes to memory, currently {} bytes in "
-                     "external storage",
-                     bytes_flushed, external_memory_.BlockSize)
-              << std::endl;
+    pmerge::println(
+        "write another {} bytes to memory, currently {} bytes in "
+        "external storage",
+        bytes_flushed, external_memory_.BlockSize);
   }
   ~SpillingBlocksWriter() {
     PMERGE_ASSERT_M(buffer_left_.size() == buffer_.size(),
