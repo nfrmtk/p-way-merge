@@ -20,6 +20,7 @@
 #include "gtest/gtest.h"
 #include "pmerge/common/print.hpp"
 #include "pmerge/common/resource.hpp"
+#include "pmerge/utils/count.hpp"
 #include "pmerge/ydb/spilling_mem.h"
 #include "pmerge/ydb/types.hpp"
 #include "utils.hpp"
@@ -41,14 +42,17 @@ static constexpr int kBlockSize = 8 * 1024 * 1024;
 template <int KeySize>
 void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
   auto resource_index{std::bitset<1>{0}};
+  int64_t current_debug_counter = debug_counter.Read();
   PMERGE_ASSERT_M(
       std::ssize(key_data) % (4 * KeySize) == 0,
       std::format("nums(size={}) must by splittable in groups of ({})",
                   std::ssize(key_data), 4 * KeySize));
   TSpilling stats{kBlockSize};
+  int cur = 0;
+  int64_t size_slots = key_data.size() / KeySize;
   auto external_memory = pmerge::ydb::MakeSlotsBlock<KeySize>(
-      stats, [cur = int{}, &key_data]() mutable { return key_data[cur++]; },
-      [] { return 0; }, key_data.size() / KeySize);
+      stats, [&cur, &key_data]() mutable { return key_data[cur++]; },
+      [] { return 1; }, size_slots);
   Defer delete_external_mem = [&]() noexcept { stats.Delete(external_memory); };
   auto buffer = MakeBuffer(4);
   std::vector<pmerge::IntermediateInteger> packed{
@@ -59,6 +63,7 @@ void TestSpillingBlockResource(std::ranges::sized_range auto&& key_data) {
   pmerge::ydb::SpillingBlockBufferedResource<1> resource{
       stats, external_memory, std::span{buffer}, resource_index};
   TestResource(resource, packed);
+  ASSERT_EQ(debug_counter.Read(), current_debug_counter + size_slots);
 }
 
 TEST(SpillingBlockResource, simple) {

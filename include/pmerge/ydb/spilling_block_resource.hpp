@@ -111,11 +111,13 @@ class SpillingBlockBufferedResource {
   __m256i GetOneHelper() {
     std::array<IntermediateInteger, 4> pack = {kInf, kInf, kInf, kInf};
     int pack_index = 0;
-    auto slot_or_finished = blocks_reader_.GetNextValid();
-    while (pack_index != 4 && slot_or_finished.has_value()) {
+    while (pack_index != 4) {
+      auto slot_or_finished = blocks_reader_.GetNextValid();
+      if (!slot_or_finished.has_value()) {
+        break;
+      }
       pack[pack_index++] =
           PackFrom(GetHash(*slot_or_finished), resource_identifier_);
-      slot_or_finished = blocks_reader_.GetNextValid();
     }
     return pmerge::simd::MakeFrom(pack);
   }

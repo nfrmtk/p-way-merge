@@ -4,6 +4,7 @@
 
 #ifndef SPILLING_BLOCK_READER_HPP
 #define SPILLING_BLOCK_READER_HPP
+#include <pmerge/utils/count.hpp>
 #include <pmerge/ydb/spilling_blocks_buffer.hpp>
 
 #include "pmerge/common/assert.hpp"
@@ -11,7 +12,6 @@
 #include "pmerge/common/resource.hpp"
 #include "pmerge/simd/utils.hpp"
 #include "pmerge/ydb/types.hpp"
-
 namespace pmerge::ydb {
 
 class SpillingBlockReader {
@@ -30,6 +30,7 @@ class SpillingBlockReader {
     if (GetAggregateValue(this_slot) == 0) {
       return std::nullopt;
     } else {
+      debug_counter.Inc();
       return std::make_optional(this_slot);
     }
   }
