@@ -28,7 +28,7 @@ cmake --build . --target merge_test_ut
 ./merge_test_ut
 ```
 
-На данный момент работают тесты merge_test, pack_test, simd_two_way_vector_resource_test и spilling_block_test.cpp.
+На данный момент работают все тесты из [pmerge/tests](pmerge/tests).
 
 
 ### environment

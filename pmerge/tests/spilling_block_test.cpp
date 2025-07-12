@@ -50,9 +50,8 @@ void TestSpillingBlockResource(auto keys, auto counts_gen, int64_t size_keys) {
   TSpilling stats{kBlockSize};
   int cur = 0;
   int64_t size_slots = size_keys / KeySize;
-  auto external_memory = pmerge::ydb::MakeSlotsBlock<KeySize>(
-      stats, keys,
-      counts_gen, size_slots);
+  auto external_memory =
+      pmerge::ydb::MakeSlotsBlock<KeySize>(stats, keys, counts_gen, size_slots);
   Defer delete_external_mem = [&]() noexcept { stats.Delete(external_memory); };
   auto buffer = MakeBuffer(4);
   std::vector<pmerge::IntermediateInteger> packed{
@@ -66,9 +65,11 @@ void TestSpillingBlockResource(auto keys, auto counts_gen, int64_t size_keys) {
   ASSERT_EQ(debug_counter.Read(), current_debug_counter + std::ssize(packed));
 }
 template <int KeySize>
-void TestSpillingBlockResourceWithNonZeroCounts(std::ranges::sized_range auto&& key_data) {
+void TestSpillingBlockResourceWithNonZeroCounts(
+    std::ranges::sized_range auto&& key_data) {
   int idx = 0;
-  TestSpillingBlockResource<KeySize>([&]{return key_data[idx++];}, []{return 1;}, std::ssize(key_data));
+  TestSpillingBlockResource<KeySize>([&] { return key_data[idx++]; },
+                                     [] { return 1; }, std::ssize(key_data));
 }
 
 TEST(SpillingBlockResource, simple) {
@@ -79,12 +80,14 @@ TYPED_TEST_SUITE(SpillingResourceSuite, test_key_sizes);
 
 TYPED_TEST(SpillingResourceSuite, same_numbers) {
   static constexpr size_t kKeySize = TypeParam::value;
-  TestSpillingBlockResourceWithNonZeroCounts<kKeySize>(std::views::repeat(1, kKeySize * 100));
+  TestSpillingBlockResourceWithNonZeroCounts<kKeySize>(
+      std::views::repeat(1, kKeySize * 100));
 }
 
 TYPED_TEST(SpillingResourceSuite, increasing) {
   static constexpr size_t kKeySize = TypeParam::value;
-  TestSpillingBlockResourceWithNonZeroCounts<kKeySize>(std::views::iota(0ull, 20 * kKeySize));
+  TestSpillingBlockResourceWithNonZeroCounts<kKeySize>(
+      std::views::iota(0ull, 20 * kKeySize));
 }
 
 TYPED_TEST(SpillingResourceSuite, random) {
@@ -98,23 +101,25 @@ TYPED_TEST(SpillingResourceSuite, random) {
   TestSpillingBlockResourceWithNonZeroCounts<kKeySize>(nums);
 }
 
-TYPED_TEST(SpillingResourceSuite, ZeroeCounts){
+TYPED_TEST(SpillingResourceSuite, ZeroeCounts) {
   static constexpr size_t kKeySize = TypeParam::value;
-  auto gen = MakeRandomGenerator(0, 1<<20);
+  auto gen = MakeRandomGenerator(0, 1 << 20);
   int64_t size = kKeySize * 100;
   auto ones = std::views::repeat(1, size);
   auto beg = ones.begin();
-  TestSpillingBlockResource<kKeySize>([&beg]{return *beg++;}, []{return 0;}, size);
-
+  TestSpillingBlockResource<kKeySize>([&beg] { return *beg++; },
+                                      [] { return 0; }, size);
 }
 
-TYPED_TEST(SpillingResourceSuite, MixCounts){
+TYPED_TEST(SpillingResourceSuite, MixCounts) {
   static constexpr size_t kKeySize = TypeParam::value;
-  int64_t size = kKeySize*100;
-  auto counts = MakeRandomGenerator(0,1);
+  int64_t size = kKeySize * 100;
+  auto counts = MakeRandomGenerator(0, 1);
   auto keys = std::views::repeat(1, size);
   int idx = 0;
-  TestSpillingBlockResource<kKeySize>([&]{return keys[idx++];}, [&counts]{return static_cast<bool>(counts());}, size);
+  TestSpillingBlockResource<kKeySize>(
+      [&] { return keys[idx++]; },
+      [&counts] { return static_cast<bool>(counts()); }, size);
 }
 
 // TEST(Merge, Random) { TestMerge<uint32_t{2}>(); }
