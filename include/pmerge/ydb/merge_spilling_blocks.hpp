@@ -4,8 +4,8 @@
 
 #ifndef MERGE_SPILLING_BLOCKS_HPP
 #define MERGE_SPILLING_BLOCKS_HPP
-#include <sys/stat.h>
 
+#include <pmerge/utils/magic_trace.hpp>
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -23,16 +23,19 @@
 #include "pmerge/simd/utils.hpp"
 #include "pmerge/ydb/types.hpp"
 #include "spilling_mem.h"
-
+#include <pmerge/utils/defer.hpp>
 namespace pmerge::ydb {
 template <bool finalize /*use fo?*/, ui32 keyCount /*hashed string length*/,
           ui32 p /*loser tree depth*/>
 ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
                 std::deque<TSpillingBlock>& spills) {
+                  pmerge::output.Mute();
+  
+                  Defer d{[] ()noexcept {pmerge::output.Unmute();}};
   int64_t slotBufferSize = BufferSizeSlots;
   int buffer_offset_slots = 0;
   auto make_buffer_with_size = [&](int size) -> std::span<ui64> {
-    PMERGE_ASSERT(size > 0);
+    PMERGE_ASSERT_M(size > 0, "you don't want to make buffer with size 0");
     PMERGE_ASSERT(buffer_offset_slots + size <= slotBufferSize);
     buffer_offset_slots += size;
     return {wordsBuffer + 8 * (buffer_offset_slots - size),
@@ -49,6 +52,7 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
       pmerge::multi_way::LoserTree<SpillingBlockBufferedResource<p>, 1 << p>;
   assert(spills.size() >= n);
   std::vector<pmerge::ydb::SpillingBlockReader> output_readers;
+  output_readers.reserve(n);
   for (int idx = 0; idx < n; ++idx) {
     output_readers.emplace_back(
         SpillingBlocksBuffer{sp, spills[idx],
@@ -62,6 +66,8 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
             sp, spills[block_index], make_buffer_with_size(input_buffer_size),
             Identifer{block_index});
       }));
+  MagicTraceTrigger();
+
   std::deque<IntermediateInteger> nums_left;
   auto append_array = [&](const std::array<IntermediateInteger, 4>& arr) {
     nums_left.push_back(arr[0]);
@@ -71,18 +77,17 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
   };
   std::vector<pmerge::ydb::Slot> slots;
   auto reset_amounts_of_slots_from = [&] {
-    auto read_num = [&]() {
-      nums_left.pop_front();
-      return nums_left.front();
-    };
     slots.clear();
     PMERGE_ASSERT_M(!nums_left.empty(), "numbers shouldn't be empty");
-    pmerge::IntermediateInteger this_num = nums_left.front();
     utils::PrintIntermediateIntegersRange(nums_left);
-    const uint64_t current_hash_bits = *pmerge::ExtractCutHash<p>(this_num);
-    while (!nums_left.empty() &&
-           *pmerge::ExtractCutHash<p>(this_num) == current_hash_bits) {
+    const uint64_t current_hash_bits = *pmerge::ExtractCutHash<p>(nums_left.front());
+    while (!nums_left.empty()) {
+      pmerge::IntermediateInteger this_num = nums_left.front();
       PMERGE_ASSERT_M(this_num != kInf, "only real numbers here are allowed");
+      if (*pmerge::ExtractCutHash<p>(this_num) != current_hash_bits){
+        break;
+      }
+      nums_left.pop_front();
       pmerge::println("{}", this_num - std::numeric_limits<int64_t>::min());
       size_t index = pmerge::ExtractIdentifer<p>(this_num)->to_ullong();
       pmerge::println("index received for hash '{}': {}", current_hash_bits,
@@ -90,7 +95,6 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
       auto next = output_readers[index].GetNextValid();
       PMERGE_ASSERT(next.has_value());
       slots.emplace_back(Slot::FromView(*next));
-      this_num = read_num();
     }
   };
   while (true) {
@@ -100,7 +104,7 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
 
     while (nums_left.empty() || ExtractCutHash<p>(nums_left.front()) ==
                                     ExtractCutHash<p>(loser_tree.Peek())) {
-      PMERGE_ASSERT_M(nums_left.front() != kInf,
+      PMERGE_ASSERT_M(nums_left.empty() || nums_left.front() != kInf,
                       "nums_left are actual nums not inf");
       append_array(simd::AsArray(loser_tree.GetOne()));
     }
@@ -132,6 +136,7 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
     sp.Delete(spills.front());
     spills.pop_front();
   }
+  MagicTraceTrigger();
   return external_memory_buffer.TotalWrites();
 }
 }  // namespace pmerge::ydb

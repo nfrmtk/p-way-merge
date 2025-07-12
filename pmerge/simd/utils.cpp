@@ -5,7 +5,7 @@
 #include <pmerge/simd/utils.hpp>
 
 namespace {
-constexpr const char* kStub = "optimised-out";
+[[maybe_unused]]constexpr const char* kStub = "optimised-out";
 }
 std::string pmerge::simd::ToString(__m256i reg) {
 #ifndef NDEBUG

@@ -11,6 +11,7 @@
 #include <concepts>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <pmerge/common/assert.hpp>
 namespace pmerge {
 using IntermediateInteger = std::int64_t;

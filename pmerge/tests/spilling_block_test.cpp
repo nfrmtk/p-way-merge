@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <memory>
 #include <pmerge/simd/utils.hpp>
+#include <pmerge/utils/defer.hpp>
 #include <pmerge/two_way/simd_two_way.hpp>
 #include <pmerge/ydb/spilling_block_resource.hpp>
 #include <random>

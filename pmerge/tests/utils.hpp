@@ -133,18 +133,6 @@ inline void GetComplimentary(const uint64_t* arr, uint64_t* dst) {
   }
 }
 
-template <typename F>
-class Defer {
- public:
-  Defer(F&& f) : fun_(std::forward<F>(f)) {
-    static_assert(std::is_nothrow_invocable_v<F>);
-  }
-  ~Defer() { fun_(); }
-
- private:
-  F fun_;
-};
-
 template <typename Callback>
 void ForEachPermutationsOfRegisters(Callback cb) {
   uint64_t vec_left[4] = {1, 2, 3, 4};
