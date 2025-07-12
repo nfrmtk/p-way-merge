@@ -90,7 +90,7 @@ inline std::vector<Slot> AsSlotsVector(TSpilling& stats,
 
 template <size_t KeySize, size_t IndexBits>
 auto ToIntermediateIntegers(std::bitset<IndexBits> index) {
-  return std::views::transform([=](const pmerge::ydb::Slot& slot) {
+  return std::views::filter([](const pmerge::ydb::Slot& slot){return pmerge::ydb::GetAggregateValue(slot.AsView()) != 0;}) | std::views::transform([=](const pmerge::ydb::Slot& slot) {
            return pmerge::PackFrom(pmerge::ydb::GetHash(slot), index);
          }) |
          std::ranges::to<std::vector<pmerge::IntermediateInteger>>();
@@ -307,5 +307,4 @@ auto MakeSpillBlocksDeque(TSpilling& stats, auto& keys_gen, auto& counts_gen,
   std::cout << std::format("total slots amount: {}", total_size_slots);
   return external_memory_chunks;
 }
-
 #endif  // UTILS_HPP

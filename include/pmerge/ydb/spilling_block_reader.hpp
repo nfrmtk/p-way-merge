@@ -54,7 +54,6 @@ class SpillingBlockReader {
     processed_bytes_ += next.size_bytes();
     pmerge::println("'{}' get another slot with hash: {}\n", name_,
                     GetHash(next));
-    PMERGE_ASSERT(GetAggregateValue(next) != 0);
     return next;
   }
 
