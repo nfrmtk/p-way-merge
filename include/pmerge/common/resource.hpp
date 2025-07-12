@@ -38,8 +38,8 @@ IntermediateInteger PackFrom(uint64_t num, std::bitset<IndexSize> index) {
   static_assert(IndexSize <= 10, "index must be small");
   uint64_t taken_bits = (num >> (IndexSize + 1)) << IndexSize;
   constexpr uint64_t kMaxIndex = 1ull << IndexSize;
-  assert(index.to_ullong() < kMaxIndex);
-  assert((index.to_ullong() & (taken_bits << IndexSize)) == 0);
+  PMERGE_ASSERT(index.to_ullong() < kMaxIndex);
+  PMERGE_ASSERT((index.to_ullong() & (taken_bits << IndexSize)) == 0);
   IntermediateInteger intermediate =
       static_cast<IntermediateInteger>(index.to_ullong()) +
       std::numeric_limits<IntermediateInteger>::min() +

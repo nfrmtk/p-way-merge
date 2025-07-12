@@ -1,9 +1,9 @@
 #pragma once
 
 #include <cstdint>
-class Count {
+class DebugCount {
  public:
-  Count() = default;
+  DebugCount() = default;
   void Inc() { value_++; }
   int64_t Read() { return value_; }
 
@@ -11,4 +11,4 @@ class Count {
   int64_t value_;
 };
 
-inline static Count debug_counter;
+inline static DebugCount debug_counter;

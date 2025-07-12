@@ -3,9 +3,14 @@
 //
 #ifndef ASSERT_HPP
 #define ASSERT_HPP
-#include <format>
-#include <iostream>
+#ifdef ARCADIA_ROOT
+#include <util/system/yassert.h>
+#define PMERGE_ASSERT_M(condition, message) Y_DEBUG_ABORT_UNLESS(condition, message)
+#define PMERGE_ASSERT(condition) Y_DEBUG_ABORT_UNLESS(condition)
+#else
 #ifndef NDEBUG
+#include <iostream>
+#include <format>
 #define PMERGE_ASSERT_M(condition, message)                              \
   do {                                                                   \
     if (!(condition)) {                                                  \
@@ -32,5 +37,5 @@
   {}
 
 #endif
-
+#endif
 #endif  // ASSERT_HPP

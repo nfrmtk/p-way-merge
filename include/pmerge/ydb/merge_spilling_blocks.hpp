@@ -4,7 +4,6 @@
 
 #ifndef MERGE_SPILLING_BLOCKS_HPP
 #define MERGE_SPILLING_BLOCKS_HPP
-#include <gmock/gmock.h>
 #include <sys/stat.h>
 
 #include <algorithm>
@@ -70,7 +69,6 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
     nums_left.push_back(arr[2]);
     nums_left.push_back(arr[3]);
   };
-  std::array<int64_t, 1 << p> amounts_of_slots_from{{}};
   std::vector<pmerge::ydb::Slot> slots;
   auto reset_amounts_of_slots_from = [&] {
     auto read_num = [&]() {

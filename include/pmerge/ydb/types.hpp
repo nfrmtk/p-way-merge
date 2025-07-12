@@ -67,7 +67,7 @@ Key<KeyCount> GetKey(ConstSlotView slot) {
 template <size_t keyCount>
 bool Equal(pmerge::ydb::Key<keyCount> first,
            pmerge::ydb::Key<keyCount> second) {
-  for (int idx = 0; idx < keyCount; ++idx) {
+  for (int idx = 0; idx < int{keyCount}; ++idx) {
     if (first[idx] != second[idx]) {
       return false;
     }
@@ -77,7 +77,7 @@ bool Equal(pmerge::ydb::Key<keyCount> first,
 
 template <size_t keyCount>
 bool Less(pmerge::ydb::Key<keyCount> first, pmerge::ydb::Key<keyCount> second) {
-  for (int idx = 0; idx < keyCount; ++idx) {
+  for (int idx = 0; idx < int{keyCount}; ++idx) {
     if (first[idx] > second[idx]) {
       return false;
     }

@@ -1,4 +1,7 @@
 #pragma once
+#ifdef ARCADIA_ROOT
+#include <campus/hashing-sorting/arun/spilling_mem.h>
+#else
 
 #include <pmerge/ydb/types.hpp>
 #include <cassert>
@@ -35,3 +38,4 @@ public:
     ui64 CurrentChunkCount = 0;
     ui64 MaxChunkCount = 0;
 };
+#endif
