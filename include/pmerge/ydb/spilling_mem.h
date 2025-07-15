@@ -39,3 +39,15 @@ public:
     ui64 MaxChunkCount = 0;
 };
 #endif
+
+template<std::ranges::range BlocksRange>
+int64_t TotalSlotsInBlocks(BlocksRange blocks)
+{
+  static_assert(std::same_as<std::ranges::range_value_t<BlocksRange>, TSpillingBlock>, "range");
+  return std::accumulate(blocks.begin(), blocks.end(), 0ll, [](int64_t total, TSpillingBlock block){
+        return total + block.BlockSize / 64;
+    });
+
+
+}
+

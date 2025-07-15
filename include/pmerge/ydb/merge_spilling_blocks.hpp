@@ -23,15 +23,18 @@
 #include "pmerge/simd/utils.hpp"
 #include "pmerge/ydb/types.hpp"
 #include "spilling_mem.h"
+#include "pmerge/utils/cout.hpp"
 #include <pmerge/utils/defer.hpp>
 namespace pmerge::ydb {
 template <bool finalize /*use fo?*/, ui32 keyCount /*hashed string length*/,
           ui32 p /*loser tree depth*/>
 ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
                 std::deque<TSpillingBlock>& spills) {
-                  pmerge::output.Mute();
+                  // pmerge::output.Mute();
   
-                  Defer d{[] ()noexcept {pmerge::output.Unmute();}};
+                  // Defer d{[] ()noexcept {pmerge::output.Unmute();}};
+  constexpr i32 n = 1ul << p;
+  Cout << std::format("total slots to be processed: {}, blocks left: {}", TotalSlotsInBlocks(spills| std::views::take(n)), std::ssize(spills));
   int64_t slotBufferSize = BufferSizeSlots;
   int buffer_offset_slots = 0;
   auto make_buffer_with_size = [&](int size) -> std::span<ui64> {
@@ -41,11 +44,11 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
     return {wordsBuffer + 8 * (buffer_offset_slots - size),
             wordsBuffer + 8 * buffer_offset_slots};
   };
-  constexpr i32 n = 1ul << p;
   using Identifer = std::bitset<p>;
   uint64_t external_buffer_size = slotBufferSize / 3;
   auto input_buffer_size = external_buffer_size >> p;
   auto output_buffer_size = external_buffer_size >> p;
+  Cout << std::format("writer buffer size: {}, resource reader buffer size: {}, match reader buffer size: {}, ", external_buffer_size, input_buffer_size, output_buffer_size);
   SpillingBlocksWriter external_memory_buffer{
       sp, sp.Empty(0), make_buffer_with_size(external_buffer_size)};
   using TreeType =
@@ -136,7 +139,9 @@ ui32 merge2pway(ui64* wordsBuffer, ui32 BufferSizeSlots, TSpilling& sp,
     sp.Delete(spills.front());
     spills.pop_front();
   }
+  PMERGE_ASSERT(!spills.empty());
   MagicTraceTrigger();
+  Cout << std::format("this time wrote {} slots to memory\n", external_memory_buffer.TotalWrites());
   return external_memory_buffer.TotalWrites();
 }
 }  // namespace pmerge::ydb

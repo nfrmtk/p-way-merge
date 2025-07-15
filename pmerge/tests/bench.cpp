@@ -24,7 +24,13 @@ int main() {
   buff.resize(kBuffSizeSlots * 8);
 
   auto keys_gen = [&rng_keys] { return rng_keys(); };
-  auto counts_gen = [] { return 1; };
+  int invalid_slots = 0;
+  auto counts_gen = [&] { 
+    int count = 1;
+    if (count == 0){
+      ++invalid_slots;
+    }
+    return count; };
   auto sizes_gen = [&rng_sizes] { return rng_sizes(); };
   auto deque =
       MakeSpillBlocksDeque<2, 4>(stats, keys_gen, counts_gen, sizes_gen);
@@ -40,4 +46,7 @@ int main() {
       break;
   }
   std::cout << std::format("finihed: total writes: {}\n", writes);
+  std::cout << std::format("buffer_size: {}\n", kBuffSizeSlots);
+  std::cout << std::format("invalid slots: {}\n", invalid_slots);
+  
 }

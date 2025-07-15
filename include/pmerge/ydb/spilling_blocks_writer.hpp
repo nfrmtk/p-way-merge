@@ -26,7 +26,7 @@ class SpillingBlocksWriter {
     total_writes_++;
     if (total_writes_ % kCurrentIntervalSlots == 0) {
       static WriteInterval write_interval;
-      write_interval.WriteHappend(kCurrentIntervalSlots);
+      // write_interval.WriteHappend(kCurrentIntervalSlots);
     }
     if (buffer_left_.empty()) {
       Flush();

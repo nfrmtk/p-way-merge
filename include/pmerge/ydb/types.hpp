@@ -7,9 +7,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <pmerge/common/assert.hpp>
+#include <ranges>
 #include <source_location>
 #include <span>
-
+#include <numeric>
 #include "pmerge/common/print.hpp"
 typedef uint32_t ui32;
 typedef int32_t i32;
